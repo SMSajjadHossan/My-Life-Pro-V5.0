@@ -552,7 +552,7 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                                       <RefreshCw size={14}/>
                                   </button>
                               </div>
-                              <p className="text-[9px] text-gray-600 mt-1">Get ID from Google Cloud Console (Enable Drive API -> Create Credentials -> OAuth Client ID).</p>
+                              <p className="text-[9px] text-gray-600 mt-1">Get ID from Google Cloud Console (Enable Drive API &rarr; Create Credentials &rarr; OAuth Client ID).</p>
                           </div>
 
                           <div className="grid grid-cols-2 gap-3">
