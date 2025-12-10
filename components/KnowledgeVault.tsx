@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Book, Plus, Trash2, Brain, Sparkles, ChevronDown, ChevronUp, Search, X, Zap, DollarSign, Dumbbell, Target, Upload, FileText, Youtube, Image as ImageIcon, Save, Edit2, FileType, Pencil, Loader, CheckCircle, Lightbulb, Play, AlertTriangle, Crosshair, ArrowRight, Library, Scroll, Table, Music, FileSpreadsheet, Cloud, Download, RefreshCw, Settings, HardDrive } from 'lucide-react';
+import { Book, Plus, Brain, Sparkles, ChevronDown, ChevronUp, Search, X, Zap, DollarSign, Dumbbell, Target, Upload, FileText, Youtube, Image as ImageIcon, Save, Edit2, FileType, Pencil, Loader, CheckCircle, Lightbulb, Play, AlertTriangle, Crosshair, ArrowRight, Library, Scroll, Table, Music, FileSpreadsheet, Cloud, Download, RefreshCw, Settings, HardDrive, Trash2 } from 'lucide-react';
 import { Book as BookType, NeuralNote } from '../types';
 import { processNeuralInput } from '../services/geminiService';
 import { THE_CODEX } from '../constants';
@@ -33,7 +33,13 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
   const [scanResultTitle, setScanResultTitle] = useState('');
   const [scanSummary, setScanSummary] = useState(''); // Executive Brief
 
-  // --- EDITING STATE ---
+  // --- SCANNER EDITING STATE ---
+  const [scannerEditingId, setScannerEditingId] = useState<string | null>(null);
+  const [scannerEditContent, setScannerEditContent] = useState<NeuralNote | null>(null);
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+  const [tempSummary, setTempSummary] = useState('');
+
+  // --- LIBRARY EDITING STATE ---
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<{concept: string, action: string, problem: string, example: string} | null>(null);
   
@@ -47,142 +53,9 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
 
   // --- DATA CORE (SYNC) STATE ---
   const [showDataCore, setShowDataCore] = useState(false);
-  const [syncState, setSyncState] = useState<'IDLE' | 'SYNCING' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [syncMsg, setSyncMsg] = useState('');
-  const [gdriveClientId, setGdriveClientId] = useState(() => localStorage.getItem('gdrive_client_id') || '');
-  const [tokenClient, setTokenClient] = useState<any>(null);
 
   // --- HANDLERS ---
-
-  // Google Drive Logic
-  useEffect(() => {
-      localStorage.setItem('gdrive_client_id', gdriveClientId);
-  }, [gdriveClientId]);
-
-  const initGapi = () => {
-      if (!(window as any).google || !(window as any).gapi) {
-          setSyncMsg("Google Scripts not loaded. Check internet.");
-          setSyncState('ERROR');
-          return;
-      }
-
-      setSyncState('SYNCING');
-      setSyncMsg("Initializing Secure Link...");
-
-      try {
-          (window as any).gapi.load('client', async () => {
-              await (window as any).gapi.client.init({
-                  discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
-              });
-              
-              const client = (window as any).google.accounts.oauth2.initTokenClient({
-                  client_id: gdriveClientId,
-                  scope: 'https://www.googleapis.com/auth/drive.file',
-                  callback: '', // Defined dynamically
-              });
-              setTokenClient(client);
-              setSyncState('SUCCESS');
-              setSyncMsg("Uplink Ready. Authenticate to proceed.");
-          });
-      } catch (e) {
-          setSyncState('ERROR');
-          setSyncMsg("Initialization Failed. Verify Client ID.");
-          console.error(e);
-      }
-  };
-
-  const handleDriveSync = (mode: 'PUSH' | 'PULL') => {
-      if (!tokenClient) { initGapi(); return; }
-      
-      setSyncState('SYNCING');
-      setSyncMsg(mode === 'PUSH' ? "Encrypting & Uploading..." : "Scanning Drive & Downloading...");
-
-      tokenClient.callback = async (resp: any) => {
-          if (resp.error) {
-              setSyncState('ERROR');
-              setSyncMsg(`Auth Error: ${resp.error}`);
-              return;
-          }
-
-          try {
-              const fileName = 'mylife_neural_vault_data.json';
-              // 1. Find file
-              const q = `name = '${fileName}' and trashed = false`;
-              const listResp = await (window as any).gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
-              const files = listResp.result.files;
-
-              if (mode === 'PUSH') {
-                  const content = JSON.stringify(books, null, 2);
-                  const file = new Blob([content], { type: 'application/json' });
-                  const metadata = {
-                      name: fileName,
-                      mimeType: 'application/json',
-                  };
-
-                  const accessToken = (window as any).gapi.client.getToken().access_token;
-                  const form = new FormData();
-                  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                  form.append('file', file);
-
-                  let url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-                  let method = 'POST';
-
-                  if (files.length > 0) {
-                      // Update existing
-                      const fileId = files[0].id;
-                      url = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`;
-                      method = 'PATCH';
-                  }
-
-                  await fetch(url, {
-                      method: method,
-                      headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
-                      body: form,
-                  });
-                  
-                  setSyncState('SUCCESS');
-                  setSyncMsg("Data Successfully Secured in Drive.");
-
-              } else {
-                  // PULL
-                  if (files.length === 0) {
-                      setSyncState('ERROR');
-                      setSyncMsg("No backup found on Drive.");
-                      return;
-                  }
-                  
-                  const fileId = files[0].id;
-                  const fileResp = await (window as any).gapi.client.drive.files.get({ fileId, alt: 'media' });
-                  const remoteData = fileResp.result; // gapi parses JSON auto if alt=media
-                  
-                  // Simple Safety Check
-                  if (Array.isArray(remoteData)) {
-                      if(confirm(`Overwrite local data with ${remoteData.length} books from Cloud?`)) {
-                          setBooks(remoteData);
-                          setSyncState('SUCCESS');
-                          setSyncMsg("Neural Vault Restored from Cloud.");
-                      } else {
-                          setSyncState('IDLE');
-                          setSyncMsg("Restore Cancelled.");
-                      }
-                  } else {
-                      setSyncState('ERROR');
-                      setSyncMsg("Corrupt Data Stream.");
-                  }
-              }
-
-          } catch (e: any) {
-              setSyncState('ERROR');
-              setSyncMsg(`Sync Failed: ${e.message || e}`);
-          }
-      };
-
-      if ((window as any).gapi.client.getToken() === null) {
-          tokenClient.requestAccessToken({ prompt: 'consent' });
-      } else {
-          tokenClient.requestAccessToken({ prompt: '' });
-      }
-  };
 
   const handleDownloadBackup = () => {
       const content = JSON.stringify(books, null, 2);
@@ -222,7 +95,6 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                   if(confirm(`Restore ${parsed.length} books? Current data will be replaced.`)) {
                       setBooks(parsed);
                       setSyncMsg("System Restored Successfully.");
-                      setSyncState('SUCCESS');
                   }
               } else {
                   alert("Invalid Format");
@@ -363,10 +235,35 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
     setScanFileType('');
   };
 
-  const deleteNote = (bookId: string, noteId: string) => {
-    setBooks(books.map(b => b.id === bookId ? { ...b, neuralNotes: b.neuralNotes.filter(n => n.id !== noteId) } : b));
+  // --- SCANNER EDITING HANDLERS ---
+  const startEditingScannedNote = (note: NeuralNote) => {
+    setScannerEditingId(note.id);
+    setScannerEditContent({...note});
   };
 
+  const saveScannedNoteEdit = () => {
+    if (!scannerEditContent) return;
+    setScannedNotes(prev => prev.map(n => n.id === scannerEditContent.id ? scannerEditContent : n));
+    setScannerEditingId(null);
+    setScannerEditContent(null);
+  };
+
+  const addManualScannedNote = () => {
+      const newNote: NeuralNote = {
+          id: Date.now().toString() + Math.random(),
+          concept: "",
+          action: "",
+          problem: "",
+          example: "",
+          iconCategory: 'MIND',
+          sourceType: 'TEXT',
+          timestamp: new Date().toISOString()
+      };
+      setScannedNotes([...scannedNotes, newNote]);
+      startEditingScannedNote(newNote); // Auto-start editing
+  };
+
+  // --- BOOK NOTE HANDLERS ---
   const startEditing = (note: NeuralNote) => {
     setEditingNoteId(note.id);
     setEditContent({ concept: note.concept, action: note.action, problem: note.problem || '', example: note.example || '' });
@@ -395,6 +292,13 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
 
   const startRenamingBook = (book: BookType, e: React.MouseEvent) => { e.stopPropagation(); setRenamingBookId(book.id); setRenameTitleContent(book.title); };
   const saveBookRename = (bookId: string) => { if (!renameTitleContent.trim()) return; setBooks(books.map(b => b.id === bookId ? { ...b, title: renameTitleContent } : b)); setRenamingBookId(null); };
+  
+  // --- DELETE BOOK HANDLER ---
+  const handleDeleteBook = (id: string) => {
+      if (confirm("Are you sure you want to delete this ENTIRE book and all its insights? This cannot be undone.")) {
+          setBooks(books.filter(b => b.id !== id));
+      }
+  };
 
   const getIcon = (category: string) => {
     switch(category) {
@@ -500,9 +404,9 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
 
                       {/* Status Display */}
                       <div className="bg-black border border-gray-800 rounded p-4 mb-6 text-center">
-                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">UPLINK STATUS</p>
-                          <p className={`text-sm font-mono font-bold ${syncState === 'SUCCESS' ? 'text-green-500' : syncState === 'ERROR' ? 'text-red-500' : syncState === 'SYNCING' ? 'text-yellow-500' : 'text-gray-300'}`}>
-                              {syncState === 'SYNCING' ? 'TRANSMITTING...' : syncMsg || 'STANDBY'}
+                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">LOCAL STATUS</p>
+                          <p className={`text-sm font-mono font-bold ${syncMsg ? 'text-green-500' : 'text-gray-300'}`}>
+                              {syncMsg || 'SYSTEM READY'}
                           </p>
                       </div>
 
@@ -528,48 +432,6 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                                   Select File
                                   <input type="file" onChange={handleRestoreBackup} className="hidden" accept=".json"/>
                               </label>
-                          </div>
-                      </div>
-
-                      {/* GOOGLE DRIVE SYNC */}
-                      <div className="border-t border-gray-800 pt-4">
-                          <div className="flex items-center gap-2 mb-3">
-                              <Cloud size={16} className="text-blue-500"/>
-                              <h4 className="text-sm font-bold text-white uppercase">Google Drive Sync</h4>
-                          </div>
-                          
-                          <div className="mb-4">
-                              <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Google Client ID (Required for Cloud)</label>
-                              <div className="flex gap-2">
-                                  <input 
-                                    type="text" 
-                                    value={gdriveClientId} 
-                                    onChange={(e) => setGdriveClientId(e.target.value)} 
-                                    placeholder="Paste OAuth 2.0 Client ID here"
-                                    className="flex-1 bg-black border border-gray-700 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
-                                  />
-                                  <button onClick={initGapi} className="bg-blue-900/20 text-blue-400 border border-blue-900 px-3 rounded hover:bg-blue-900/40" title="Initialize">
-                                      <RefreshCw size={14}/>
-                                  </button>
-                              </div>
-                              <p className="text-[9px] text-gray-600 mt-1">Get ID from Google Cloud Console (Enable Drive API &rarr; Create Credentials &rarr; OAuth Client ID).</p>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                              <button 
-                                onClick={() => handleDriveSync('PUSH')}
-                                disabled={!gdriveClientId}
-                                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2"
-                              >
-                                  <Upload size={14}/> Push to Cloud
-                              </button>
-                              <button 
-                                onClick={() => handleDriveSync('PULL')}
-                                disabled={!gdriveClientId}
-                                className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2 border border-gray-700"
-                              >
-                                  <Download size={14}/> Pull from Cloud
-                              </button>
                           </div>
                       </div>
                   </div>
@@ -661,50 +523,102 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                                 <Pencil size={14} className="text-gray-500" />
                             </div>
                         </div>
-                        {scanSummary && (
-                            <div className="bg-purple-900/10 border border-purple-900/50 rounded-lg relative overflow-hidden flex flex-col max-h-96">
+                        {/* Executive Brief Editor */}
+                        {(scanSummary || isEditingSummary) && (
+                            <div className="bg-purple-900/10 border border-purple-900/50 rounded-lg relative overflow-hidden flex flex-col max-h-96 group">
                                 <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none"><Brain size={48} className="text-purple-500"/></div>
-                                <div className="flex items-center gap-2 p-4 border-b border-purple-900/30 bg-purple-900/20">
-                                    <Brain size={16} className="text-purple-400" />
-                                    <h4 className="text-xs font-bold text-purple-200 uppercase">Executive Brief (SITREP)</h4>
+                                <div className="flex items-center justify-between p-4 border-b border-purple-900/30 bg-purple-900/20">
+                                    <div className="flex items-center gap-2">
+                                        <Brain size={16} className="text-purple-400" />
+                                        <h4 className="text-xs font-bold text-purple-200 uppercase">Executive Brief (SITREP)</h4>
+                                    </div>
+                                    <button onClick={() => {
+                                        if (isEditingSummary) setScanSummary(tempSummary);
+                                        else setTempSummary(scanSummary);
+                                        setIsEditingSummary(!isEditingSummary);
+                                    }} className="text-xs text-purple-400 hover:text-white uppercase font-bold">
+                                        {isEditingSummary ? 'Save Brief' : 'Edit Brief'}
+                                    </button>
                                 </div>
                                 <div className="p-4 overflow-y-auto custom-scrollbar">
-                                    <p className="text-sm text-gray-300 italic leading-relaxed whitespace-pre-line">"{scanSummary}"</p>
+                                    {isEditingSummary ? (
+                                        <textarea 
+                                            value={tempSummary}
+                                            onChange={(e) => setTempSummary(e.target.value)}
+                                            className="w-full h-40 bg-black/50 border border-purple-500/50 text-white p-2 rounded text-sm font-mono outline-none"
+                                        />
+                                    ) : (
+                                        <p className="text-sm text-gray-300 italic leading-relaxed whitespace-pre-line">"{scanSummary}"</p>
+                                    )}
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* EXCEL-LIKE DATA GRID */}
-                    <div className="overflow-x-auto rounded-lg border border-gray-700">
-                        <div className="flex items-center gap-2 mb-2 px-2">
+                    {/* EXCEL-LIKE DATA GRID (EDITABLE) */}
+                    <div className="flex justify-between items-center mb-2 px-2">
+                        <div className="flex items-center gap-2">
                             <FileSpreadsheet size={16} className="text-green-500"/>
-                            <span className="text-xs text-gray-400 uppercase font-bold">Data Matrix View</span>
+                            <span className="text-xs text-gray-400 uppercase font-bold">Data Matrix View (Editable)</span>
                         </div>
+                        <button onClick={addManualScannedNote} className="text-[10px] bg-blue-600/20 text-blue-400 border border-blue-600 px-2 py-1 rounded font-bold uppercase hover:bg-blue-600 hover:text-white transition-all">+ Add Row</button>
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-gray-700">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead className="bg-slate-900 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-600">
                                 <tr>
-                                    <th className="p-3 border-r border-gray-700 w-[25%]"><Table size={14} className="inline mr-1 mb-0.5"/> Concept / Key Point</th>
-                                    <th className="p-3 border-r border-gray-700 w-[25%]"><AlertTriangle size={14} className="inline mr-1 mb-0.5 text-red-500"/> Real-Life Problem</th>
-                                    <th className="p-3 border-r border-gray-700 w-[25%] bg-green-900/20 text-green-400"><Crosshair size={14} className="inline mr-1 mb-0.5"/> Short Action</th>
-                                    <th className="p-3 w-[25%]"><Lightbulb size={14} className="inline mr-1 mb-0.5 text-yellow-500"/> Example</th>
+                                    <th className="p-3 border-r border-gray-700 w-[23%]"><Table size={14} className="inline mr-1 mb-0.5"/> Concept</th>
+                                    <th className="p-3 border-r border-gray-700 w-[23%]"><AlertTriangle size={14} className="inline mr-1 mb-0.5 text-red-500"/> Problem</th>
+                                    <th className="p-3 border-r border-gray-700 w-[23%] bg-green-900/20 text-green-400"><Crosshair size={14} className="inline mr-1 mb-0.5"/> Action</th>
+                                    <th className="p-3 border-r border-gray-700 w-[23%]"><Lightbulb size={14} className="inline mr-1 mb-0.5 text-yellow-500"/> Example</th>
+                                    <th className="p-3 w-[8%] text-center">Cmd</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-black/50 text-gray-300 font-mono">
                                 {scannedNotes.map((note, idx) => (
-                                    <tr key={idx} className="group hover:bg-slate-900/50 transition-colors border-b border-gray-800 last:border-0">
-                                        <td className="p-3 border-r border-gray-700 align-top whitespace-pre-line leading-relaxed border-l-4 border-l-purple-500/0 group-hover:border-l-purple-500 transition-all">
-                                            {note.concept}
-                                        </td>
-                                        <td className="p-3 border-r border-gray-700 align-top text-red-300 whitespace-pre-line leading-relaxed bg-red-950/10">
-                                            {note.problem || "-"}
-                                        </td>
-                                        <td className="p-3 border-r border-gray-700 align-top bg-green-900/10 text-green-300 font-bold whitespace-pre-line leading-relaxed">
-                                            {note.action}
-                                        </td>
-                                        <td className="p-3 align-top text-yellow-200/80 italic whitespace-pre-line leading-relaxed bg-yellow-900/5">
-                                            {note.example || "-"}
-                                        </td>
+                                    <tr key={note.id || idx} className={`border-b border-gray-800 last:border-0 ${scannerEditingId === note.id ? 'bg-blue-900/10' : 'hover:bg-slate-900/50'}`}>
+                                        {scannerEditingId === note.id ? (
+                                            <>
+                                                <td className="p-2 border-r border-gray-700 align-top">
+                                                    <textarea value={scannerEditContent?.concept} onChange={e => setScannerEditContent(prev => prev ? {...prev, concept: e.target.value} : null)} className="w-full bg-slate-950 border border-blue-500 rounded p-1 text-white text-xs h-20 outline-none resize-none" />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-700 align-top">
+                                                    <textarea value={scannerEditContent?.problem} onChange={e => setScannerEditContent(prev => prev ? {...prev, problem: e.target.value} : null)} className="w-full bg-slate-950 border border-red-500 rounded p-1 text-white text-xs h-20 outline-none resize-none" />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-700 align-top">
+                                                    <textarea value={scannerEditContent?.action} onChange={e => setScannerEditContent(prev => prev ? {...prev, action: e.target.value} : null)} className="w-full bg-slate-950 border border-green-500 rounded p-1 text-white text-xs h-20 outline-none resize-none" />
+                                                </td>
+                                                <td className="p-2 border-r border-gray-700 align-top">
+                                                    <textarea value={scannerEditContent?.example} onChange={e => setScannerEditContent(prev => prev ? {...prev, example: e.target.value} : null)} className="w-full bg-slate-950 border border-yellow-500 rounded p-1 text-white text-xs h-20 outline-none resize-none" />
+                                                </td>
+                                                <td className="p-2 align-middle text-center">
+                                                    <div className="flex flex-col gap-2">
+                                                        <button onClick={saveScannedNoteEdit} className="text-green-500 hover:text-white bg-green-900/20 p-1.5 rounded"><Save size={14}/></button>
+                                                        <button onClick={() => setScannerEditingId(null)} className="text-red-500 hover:text-white bg-red-900/20 p-1.5 rounded"><X size={14}/></button>
+                                                    </div>
+                                                </td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="p-3 border-r border-gray-700 align-top whitespace-pre-line leading-relaxed border-l-4 border-l-purple-500/0 hover:border-l-purple-500 transition-all">
+                                                    {note.concept}
+                                                </td>
+                                                <td className="p-3 border-r border-gray-700 align-top text-red-300 whitespace-pre-line leading-relaxed bg-red-950/10">
+                                                    {note.problem || "-"}
+                                                </td>
+                                                <td className="p-3 border-r border-gray-700 align-top bg-green-900/10 text-green-300 font-bold whitespace-pre-line leading-relaxed">
+                                                    {note.action}
+                                                </td>
+                                                <td className="p-3 border-r border-gray-700 align-top text-yellow-200/80 italic whitespace-pre-line leading-relaxed bg-yellow-900/5">
+                                                    {note.example || "-"}
+                                                </td>
+                                                <td className="p-2 align-top text-center">
+                                                    <div className="flex flex-col gap-2 opacity-0 hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => startEditingScannedNote(note)} className="text-blue-500 hover:text-blue-300 bg-blue-900/20 p-1.5 rounded w-full flex justify-center"><Edit2 size={12}/></button>
+                                                    </div>
+                                                </td>
+                                            </>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -761,8 +675,20 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <span className="text-[10px] text-gray-500 font-mono">{book.neuralNotes?.length || 0} Insights</span>
-                            <button onClick={() => setActiveBookId(activeBookId === book.id ? null : book.id)} className="p-2 hover:bg-gray-800 rounded text-gray-400">{activeBookId === book.id ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}</button>
+                            <span className="text-[10px] text-gray-500 font-mono hidden md:inline">{book.neuralNotes?.length || 0} Insights</span>
+                            
+                            {/* NEW DELETE BUTTON */}
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleDeleteBook(book.id); }}
+                                className="p-2 hover:bg-red-900/20 text-gray-600 hover:text-red-500 rounded transition-colors"
+                                title="Delete Book"
+                            >
+                                <Trash2 size={16}/>
+                            </button>
+
+                            <button onClick={() => setActiveBookId(activeBookId === book.id ? null : book.id)} className="p-2 hover:bg-gray-800 rounded text-gray-400">
+                                {activeBookId === book.id ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+                            </button>
                         </div>
                     </div>
 
@@ -820,7 +746,6 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                                         </div>
                                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button onClick={() => startEditing(note)} className="p-1.5 hover:bg-blue-900/30 text-gray-500 hover:text-blue-400 rounded"><Edit2 size={14}/></button>
-                                            <button onClick={() => deleteNote(book.id, note.id)} className="p-1.5 hover:bg-red-900/30 text-gray-500 hover:text-red-500 rounded"><Trash2 size={14}/></button>
                                         </div>
                                     </div>
                                 ))}

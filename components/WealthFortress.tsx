@@ -39,13 +39,6 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
   const [activeTab, setActiveTab] = useState<'COMMAND' | 'JOURNAL' | 'PORTFOLIO' | 'OFFENSE' | 'FIRE' | 'AUDIT' | 'BLUEPRINT'>('COMMAND');
   const [fireChartMode, setFireChartMode] = useState<'WEALTH' | 'VELOCITY'>('WEALTH');
 
-  // --- GOOGLE DRIVE SYNC STATE ---
-  const [showSync, setShowSync] = useState(false);
-  const [syncState, setSyncState] = useState<'IDLE' | 'SYNCING' | 'SUCCESS' | 'ERROR'>('IDLE');
-  const [syncMsg, setSyncMsg] = useState('');
-  const [gdriveClientId, setGdriveClientId] = useState(() => localStorage.getItem('gdrive_client_id') || '');
-  const [tokenClient, setTokenClient] = useState<any>(null);
-
   // --- REALITY JOURNAL STATE (DYNAMIC) ---
   const [journalData, setJournalData] = useState<JournalData>(() => {
       const saved = localStorage.getItem('wealth_journal_data_v2');
@@ -188,84 +181,6 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
   const [fireInputs, setFireInputs] = useState({ monthlySip: '5000', lumpsum: '100000', inflation: '8.5', returnRate: '12', target: '10000000', years: '15' });
   const [showReconcile, setShowReconcile] = useState(false);
   const [reconcileValues, setReconcileValues] = useState({ A: '', B: '', C: '' });
-
-  // --- 3. SYNC HANDLERS ---
-  useEffect(() => { localStorage.setItem('gdrive_client_id', gdriveClientId); }, [gdriveClientId]);
-
-  const initGapi = () => {
-      if (!(window as any).google || !(window as any).gapi) {
-          setSyncMsg("System Error: Google API Scripts Missing.");
-          setSyncState('ERROR');
-          return;
-      }
-      setSyncState('SYNCING');
-      setSyncMsg("Handshaking with Google Cloud...");
-      try {
-          (window as any).gapi.load('client', async () => {
-              await (window as any).gapi.client.init({ discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
-              const client = (window as any).google.accounts.oauth2.initTokenClient({
-                  client_id: gdriveClientId,
-                  scope: 'https://www.googleapis.com/auth/drive.file',
-                  callback: '',
-              });
-              setTokenClient(client);
-              setSyncState('SUCCESS');
-              setSyncMsg("Uplink Established. Ready for Authentication.");
-          });
-      } catch (e) {
-          setSyncState('ERROR');
-          setSyncMsg("Init Failed. Verify Client ID.");
-      }
-  };
-
-  const handleFinancialSync = (mode: 'PUSH' | 'PULL') => {
-      if (!tokenClient) { initGapi(); return; }
-      setSyncState('SYNCING');
-      setSyncMsg(mode === 'PUSH' ? "Encrypting Ledger & Uploading..." : "Locating Ledger in Cloud...");
-
-      tokenClient.callback = async (resp: any) => {
-          if (resp.error) { setSyncState('ERROR'); setSyncMsg(`Auth Failed: ${resp.error}`); return; }
-          try {
-              const fileName = 'mylife_financial_core.json';
-              const q = `name = '${fileName}' and trashed = false`;
-              const listResp = await (window as any).gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
-              const files = listResp.result.files;
-
-              if (mode === 'PUSH') {
-                  const content = JSON.stringify(data, null, 2);
-                  const file = new Blob([content], { type: 'application/json' });
-                  const metadata = { name: fileName, mimeType: 'application/json' };
-                  const accessToken = (window as any).gapi.client.getToken().access_token;
-                  const form = new FormData();
-                  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                  form.append('file', file);
-                  
-                  let url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-                  let method = 'POST';
-                  if (files.length > 0) {
-                      url = `https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=multipart`;
-                      method = 'PATCH';
-                  }
-                  await fetch(url, { method: method, headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }), body: form });
-                  setSyncState('SUCCESS');
-                  setSyncMsg("Ledger Secured in Vault (Drive).");
-              } else {
-                  if (files.length === 0) { setSyncState('ERROR'); setSyncMsg("No Ledger Found."); return; }
-                  const fileId = files[0].id;
-                  const fileResp = await (window as any).gapi.client.drive.files.get({ fileId, alt: 'media' });
-                  const remoteData = fileResp.result;
-                  if (remoteData && remoteData.bankA !== undefined) {
-                      if(confirm(`Overwrite Local Ledger with Cloud Data?\nCloud Cash: ৳${(remoteData.bankA+remoteData.bankB+remoteData.bankC).toLocaleString()}`)) {
-                          updateData(remoteData);
-                          setSyncState('SUCCESS');
-                          setSyncMsg("Ledger Restored Successfully.");
-                      } else { setSyncState('IDLE'); setSyncMsg("Restore Cancelled."); }
-                  } else { setSyncState('ERROR'); setSyncMsg("Corrupt Data Stream."); }
-              }
-          } catch (e: any) { setSyncState('ERROR'); setSyncMsg(`Sync Error: ${e.message || e}`); }
-      };
-      (window as any).gapi.client.getToken() === null ? tokenClient.requestAccessToken({ prompt: 'consent' }) : tokenClient.requestAccessToken({ prompt: '' });
-  };
 
   // --- 4. TRANSACTION LOGIC ---
   const handleSaveTransaction = () => {
@@ -679,35 +594,6 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
                             <input type="number" placeholder={data.bankC.toString()} value={reconcileValues.C} onChange={e => setReconcileValues({...reconcileValues, C: e.target.value})} className="w-full bg-black border border-gray-700 text-white p-2 rounded mt-1"/>
                         </div>
                         <button onClick={handleReconcile} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded text-xs uppercase mt-2">Force Update</button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* SYNC MODAL */}
-        {showSync && (
-            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-                <div className="bg-slate-950 border border-blue-500/50 rounded-xl w-full max-w-lg shadow-2xl relative">
-                    <div className="p-6">
-                        <div className="flex justify-between items-start mb-6">
-                            <div><h3 className="text-xl font-black text-white uppercase flex items-center gap-2"><Cloud className="text-blue-500" /> Ledger Cloud Uplink</h3><p className="text-xs text-blue-400 font-mono mt-1">SECURE FINANCIAL DATA TRANSFER</p></div>
-                            <button onClick={() => setShowSync(false)} className="text-gray-500 hover:text-white"><X size={24}/></button>
-                        </div>
-                        <div className="bg-black border border-gray-800 rounded p-4 mb-6 text-center">
-                            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">UPLINK STATUS</p>
-                            <p className={`text-sm font-mono font-bold ${syncState === 'SUCCESS' ? 'text-green-500' : syncState === 'ERROR' ? 'text-red-500' : syncState === 'SYNCING' ? 'text-yellow-500' : 'text-gray-300'}`}>{syncState === 'SYNCING' ? 'TRANSMITTING ENCRYPTED LEDGER...' : syncMsg || 'STANDBY'}</p>
-                        </div>
-                        <div className="mb-4">
-                            <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Google Client ID</label>
-                            <div className="flex gap-2">
-                                <input type="text" value={gdriveClientId} onChange={(e) => setGdriveClientId(e.target.value)} placeholder="OAuth 2.0 Client ID" className="flex-1 bg-black border border-gray-700 rounded p-2 text-xs text-white outline-none focus:border-blue-500"/>
-                                <button onClick={initGapi} className="bg-blue-900/20 text-blue-400 border border-blue-900 px-3 rounded hover:bg-blue-900/40"><RefreshCw size={14}/></button>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => handleFinancialSync('PUSH')} disabled={!gdriveClientId} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2"><Upload size={14}/> Push Backup</button>
-                            <button onClick={() => handleFinancialSync('PULL')} disabled={!gdriveClientId} className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2 border border-gray-700"><Download size={14}/> Restore Data</button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1456,9 +1342,6 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
            <p className="text-xs text-gray-400 font-mono mt-1">EXPERT LEDGER • REAL-TIME INFLATION {INFLATION_RATE_BD * 100}% • AUTO-DISTRIBUTION ONLINE</p>
         </div>
         <div className="flex flex-wrap gap-2">
-            <button onClick={() => setShowSync(true)} className="px-3 py-2 rounded text-xs font-bold uppercase flex items-center gap-1 bg-slate-900 text-blue-400 border border-blue-900/50 hover:bg-blue-900/20 hover:border-blue-500 transition-all shadow-[0_0_10px_rgba(41,121,255,0.2)]">
-                <Cloud size={14}/> Uplink
-            </button>
             {[
                 {id: 'COMMAND', icon: LayoutDashboard, label: 'Command Center'},
                 {id: 'JOURNAL', icon: Brain, label: 'Journal'}, 
@@ -1482,35 +1365,6 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
             ))}
         </div>
       </header>
-
-      {/* SYNC MODAL */}
-      {showSync && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-              <div className="bg-slate-950 border border-blue-500/50 rounded-xl w-full max-w-lg shadow-2xl relative">
-                  <div className="p-6">
-                      <div className="flex justify-between items-start mb-6">
-                          <div><h3 className="text-xl font-black text-white uppercase flex items-center gap-2"><Cloud className="text-blue-500" /> Ledger Cloud Uplink</h3><p className="text-xs text-blue-400 font-mono mt-1">SECURE FINANCIAL DATA TRANSFER</p></div>
-                          <button onClick={() => setShowSync(false)} className="text-gray-500 hover:text-white"><X size={24}/></button>
-                      </div>
-                      <div className="bg-black border border-gray-800 rounded p-4 mb-6 text-center">
-                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">UPLINK STATUS</p>
-                          <p className={`text-sm font-mono font-bold ${syncState === 'SUCCESS' ? 'text-green-500' : syncState === 'ERROR' ? 'text-red-500' : syncState === 'SYNCING' ? 'text-yellow-500' : 'text-gray-300'}`}>{syncState === 'SYNCING' ? 'TRANSMITTING ENCRYPTED LEDGER...' : syncMsg || 'STANDBY'}</p>
-                      </div>
-                      <div className="mb-4">
-                          <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Google Client ID</label>
-                          <div className="flex gap-2">
-                              <input type="text" value={gdriveClientId} onChange={(e) => setGdriveClientId(e.target.value)} placeholder="OAuth 2.0 Client ID" className="flex-1 bg-black border border-gray-700 rounded p-2 text-xs text-white outline-none focus:border-blue-500"/>
-                              <button onClick={initGapi} className="bg-blue-900/20 text-blue-400 border border-blue-900 px-3 rounded hover:bg-blue-900/40"><RefreshCw size={14}/></button>
-                          </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                          <button onClick={() => handleFinancialSync('PUSH')} disabled={!gdriveClientId} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2"><Upload size={14}/> Push Backup</button>
-                          <button onClick={() => handleFinancialSync('PULL')} disabled={!gdriveClientId} className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2 border border-gray-700"><Download size={14}/> Restore Data</button>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      )}
 
       {activeTab === 'COMMAND' && renderCommandCenter()}
       {activeTab === 'BLUEPRINT' && renderBlueprint()}

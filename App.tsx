@@ -10,9 +10,12 @@ import { WarRoom } from './components/WarRoom';
 import { AppSection, FinancialState, Habit, Book, UserProfile, Transaction } from './types';
 import { INITIAL_USER_PROFILE, INITIAL_HABITS, INITIAL_LIBRARY } from './constants';
 import { Command, Search, Zap, DollarSign, CheckSquare, ArrowRight, X, Terminal, Cpu } from 'lucide-react';
+import { db } from './services/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
   const [currentSection, setCurrentSection] = useState<AppSection>(AppSection.WEALTH);
+  const [isFirebaseLive, setIsFirebaseLive] = useState(false);
   
   // -- USER PROFILE WITH XP --
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -26,8 +29,6 @@ const App: React.FC = () => {
   });
 
   // State initialization with SAFETY MERGE
-  // This prevents the "White Screen of Death" by ensuring all arrays exist, 
-  // even if localStorage has old data.
   const [financialData, setFinancialData] = useState<FinancialState>(() => {
     const defaultData: FinancialState = {
       bankA: 0, bankB: 0, bankC: 0, monthlyIncome: 0,
@@ -50,7 +51,6 @@ const App: React.FC = () => {
         return {
             ...defaultData,
             ...parsed,
-            // Force arrays to be arrays (fixes crash if they are undefined in old data)
             transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
             assets: Array.isArray(parsed.assets) ? parsed.assets : [],
             businesses: Array.isArray(parsed.businesses) ? parsed.businesses : [],
@@ -99,11 +99,72 @@ const App: React.FC = () => {
       }
   });
 
-  // Persistence Effects
-  useEffect(() => { localStorage.setItem('financialData', JSON.stringify(financialData)); }, [financialData]);
-  useEffect(() => { localStorage.setItem('habits', JSON.stringify(habits)); }, [habits]);
-  useEffect(() => { localStorage.setItem('books', JSON.stringify(books)); }, [books]);
-  useEffect(() => { localStorage.setItem('user_profile', JSON.stringify(userProfile)); }, [userProfile]);
+  // --- 🔥 REAL-TIME FIREBASE SYNC (THE "PULL" LOGIC) ---
+  // Subscribes to Cloud DB and updates local state instantly when Android updates.
+  useEffect(() => {
+    if (!db) return;
+
+    // Listen to the 'commander_data' document in the 'users' collection
+    const userDocRef = doc(db, 'users', 'commander_data');
+
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            // Only update if remote data exists.
+            // This enables "Live Sync" - changes on Phone appear here instantly.
+            console.log("🔥 Cloud Data Received");
+            
+            // We only update if the timestamps differ or simple overwrite
+            if (data.financialData) setFinancialData(data.financialData);
+            if (data.habits) setHabits(data.habits);
+            if (data.books) setBooks(data.books);
+            if (data.userProfile) setUserProfile(data.userProfile);
+            if (data.objectives) setObjectives(data.objectives);
+            
+            setIsFirebaseLive(true);
+        }
+    }, (error) => {
+        console.error("Firebase Sync Error:", error);
+        setIsFirebaseLive(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // --- 🔥 AUTO-SAVE LOGIC (THE "PUSH" LOGIC) ---
+  // Debounce updates: Wait 2 seconds after typing stops, then push to Cloud.
+  useEffect(() => {
+      // 1. Save to Local Storage (Instant)
+      localStorage.setItem('financialData', JSON.stringify(financialData));
+      localStorage.setItem('habits', JSON.stringify(habits));
+      localStorage.setItem('books', JSON.stringify(books));
+      localStorage.setItem('user_profile', JSON.stringify(userProfile));
+      localStorage.setItem('dash_objectives', JSON.stringify(objectives));
+
+      // 2. Push to Firebase (Debounced)
+      if (!db) return;
+
+      const timer = setTimeout(async () => {
+          try {
+              const userDocRef = doc(db, 'users', 'commander_data');
+              await setDoc(userDocRef, {
+                  financialData,
+                  habits,
+                  books,
+                  userProfile,
+                  objectives,
+                  lastUpdated: new Date().toISOString(),
+                  device: navigator.userAgent
+              }, { merge: true });
+              console.log("☁️ Auto-Saved to Cloud");
+          } catch (e) {
+              console.error("Cloud Save Failed", e);
+          }
+      }, 2000); // 2 second delay
+
+      return () => clearTimeout(timer);
+  }, [financialData, habits, books, userProfile, objectives]);
+
 
   // --- LOGIC HELPERS ---
   const calculateStreak = (history: string[]): number => {
@@ -143,7 +204,6 @@ const App: React.FC = () => {
           }
           return { ...prev, xp: newXp };
       });
-      // Trigger Notification
       showToast(`+${amount} XP Gained`, 'success');
   };
 
@@ -208,7 +268,6 @@ const App: React.FC = () => {
       setCmdOpen(false);
       setCmdQuery('');
 
-      // 1. NAVIGATION
       if (lower.includes('wealth')) { setCurrentSection(AppSection.WEALTH); return; }
       if (lower.includes('health') || lower.includes('spartan')) { setCurrentSection(AppSection.SPARTAN); return; }
       if (lower.includes('war') || lower.includes('chat')) { setCurrentSection(AppSection.WAR_ROOM); return; }
@@ -216,8 +275,6 @@ const App: React.FC = () => {
       if (lower.includes('learn') || lower.includes('book')) { setCurrentSection(AppSection.KNOWLEDGE); return; }
       if (lower.includes('goal') || lower.includes('acad')) { setCurrentSection(AppSection.ACADEMY); return; }
 
-      // 2. QUICK ACTIONS
-      // Syntax: /log [amount] [desc]
       if (lower.startsWith('/log')) {
           const parts = lower.split(' ');
           if (parts.length >= 3) {
@@ -232,11 +289,7 @@ const App: React.FC = () => {
                       category: 'Needs',
                       bank: 'C'
                   };
-                  setFinancialData(prev => ({
-                      ...prev,
-                      bankC: prev.bankC - amount,
-                      transactions: [newTx, ...prev.transactions]
-                  }));
+                  setFinancialData(prev => ({ ...prev, bankC: prev.bankC - amount, transactions: [newTx, ...prev.transactions] }));
                   showToast(`Logged ৳${amount} for ${desc}`, 'success');
                   addXp(20);
                   return;
@@ -244,7 +297,6 @@ const App: React.FC = () => {
           }
       }
 
-      // Syntax: /done [habit_part_name]
       if (lower.startsWith('/done')) {
           const search = lower.replace('/done', '').trim();
           const target = habits.find(h => h.name.toLowerCase().includes(search));
@@ -258,7 +310,6 @@ const App: React.FC = () => {
           }
       }
 
-      // Syntax: /audit
       if (lower.startsWith('/audit')) {
           localStorage.setItem('pending_audit', 'true');
           setCurrentSection(AppSection.WAR_ROOM);
@@ -266,17 +317,10 @@ const App: React.FC = () => {
           return;
       }
 
-      // 3. FALLBACK: ASK AI
-      // If it's not a command, send it to War Room
       const warRoomHistory = JSON.parse(localStorage.getItem('war_room_chat') || '[]');
-      warRoomHistory.push({
-          id: Date.now().toString(),
-          role: 'user',
-          content: cmd,
-          timestamp: new Date().toISOString()
-      });
+      warRoomHistory.push({ id: Date.now().toString(), role: 'user', content: cmd, timestamp: new Date().toISOString() });
       localStorage.setItem('war_room_chat', JSON.stringify(warRoomHistory));
-      localStorage.setItem('pending_ai_trigger', 'true'); // Flag for WarRoom to auto-send
+      localStorage.setItem('pending_ai_trigger', 'true'); 
       setCurrentSection(AppSection.WAR_ROOM);
   };
 
@@ -301,7 +345,6 @@ const App: React.FC = () => {
 
   return (
     <>
-        {/* TOAST NOTIFICATION */}
         {toast && (
             <div className={`fixed top-4 right-4 z-[100] px-6 py-3 rounded shadow-2xl border flex items-center gap-3 animate-in slide-in-from-top-5 ${toast.type === 'success' ? 'bg-green-900/90 border-green-500 text-white' : toast.type === 'error' ? 'bg-red-900/90 border-red-500 text-white' : 'bg-slate-900/90 border-blue-500 text-white'}`}>
                 {toast.type === 'success' && <CheckSquare size={18}/>}
@@ -309,11 +352,9 @@ const App: React.FC = () => {
             </div>
         )}
 
-        {/* COMMAND CENTER OVERLAY */}
         {cmdOpen && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center pt-[15vh] animate-in fade-in duration-200" onClick={() => setCmdOpen(false)}>
                 <div className="w-full max-w-2xl bg-black border border-gray-700 rounded-xl shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-                    {/* Header Input */}
                     <div className="flex items-center gap-4 p-4 border-b border-gray-800">
                         <Terminal className="text-spartan-red" size={24} />
                         <input 
@@ -330,7 +371,6 @@ const App: React.FC = () => {
                         </div>
                     </div>
                     
-                    {/* Suggestions / Results */}
                     <div className="max-h-[300px] overflow-y-auto p-2 bg-slate-950/50">
                         {!cmdQuery && (
                             <div className="p-2 space-y-2">
@@ -348,12 +388,6 @@ const App: React.FC = () => {
                                         </div>
                                     </button>
                                 ))}
-                                <p className="text-[10px] uppercase font-bold text-gray-500 pl-2 mt-4 mb-1">Power Commands</p>
-                                <div className="text-xs text-gray-400 font-mono space-y-1 pl-3">
-                                    <p><span className="text-spartan-red">/log 500 Lunch</span> - Quick Expense</p>
-                                    <p><span className="text-spartan-red">/done HabitName</span> - Toggle Habit</p>
-                                    <p><span className="text-spartan-red">/audit</span> - Generate Life Report</p>
-                                </div>
                             </div>
                         )}
                         {cmdQuery && (
@@ -373,7 +407,11 @@ const App: React.FC = () => {
             </div>
         )}
 
-        <Layout currentSection={currentSection} setSection={setCurrentSection}>
+        <Layout 
+            currentSection={currentSection} 
+            setSection={setCurrentSection}
+            isFirebaseLive={isFirebaseLive} // PASS TO LAYOUT
+        >
           {renderSection()}
         </Layout>
     </>
