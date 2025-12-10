@@ -666,13 +666,13 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData }) =
                             
                             <div className="space-y-4">
                                 <p className="text-sm text-gray-400 leading-relaxed font-mono">
-                                    <span className="text-electric-blue font-bold">>_</span> Initialize Master Archive Protocol V4. This advanced utility exports <span className="text-white font-bold">100% of System Data</span> into a <span className="text-white font-bold">16-Column Unified CSV</span> optimized for Excel Pivot Tables. 
+                                    <span className="text-electric-blue font-bold">&gt;_</span> Initialize Master Archive Protocol V4. This advanced utility exports <span className="text-white font-bold">100% of System Data</span> into a <span className="text-white font-bold">16-Column Unified CSV</span> optimized for Excel Pivot Tables. 
                                 </p>
                                 <div className="bg-black/50 border border-gray-800 rounded p-4 font-mono text-xs text-gray-500 space-y-1">
-                                    <p className="flex justify-between"><span>> Wealth_Ledger (Tx + Assets + Liabilities)...</span> <span className="text-wealth-green">READY</span></p>
-                                    <p className="flex justify-between"><span>> Wealth_Audits (Budget Snapshots + Mindset)...</span> <span className="text-wealth-green">READY</span></p>
-                                    <p className="flex justify-between"><span>> Neural_Scanner (Concept + Problem + Action)...</span> <span className="text-wealth-green">READY</span></p>
-                                    <p className="flex justify-between"><span>> Academy_Intel (Failures + Gaps + Capitals)...</span> <span className="text-wealth-green">READY</span></p>
+                                    <p className="flex justify-between"><span>&gt; Wealth_Ledger (Tx + Assets + Liabilities)...</span> <span className="text-wealth-green">READY</span></p>
+                                    <p className="flex justify-between"><span>&gt; Wealth_Audits (Budget Snapshots + Mindset)...</span> <span className="text-wealth-green">READY</span></p>
+                                    <p className="flex justify-between"><span>&gt; Neural_Scanner (Concept + Problem + Action)...</span> <span className="text-wealth-green">READY</span></p>
+                                    <p className="flex justify-between"><span>&gt; Academy_Intel (Failures + Gaps + Capitals)...</span> <span className="text-wealth-green">READY</span></p>
                                 </div>
                             </div>
                         </div>

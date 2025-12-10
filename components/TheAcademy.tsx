@@ -108,12 +108,12 @@ export const TheAcademy: React.FC = () => {
   const [pomoStreak, setPomoStreak] = useState(0);
 
   // PERSISTENCE EFFECTS
-  useEffect(() => { localStorage.setItem('academy_capitals', JSON.stringify(capitals)), [capitals]; });
-  useEffect(() => { localStorage.setItem('academy_gaps', JSON.stringify(gaps)), [gaps]; });
-  useEffect(() => { localStorage.setItem('academy_bezos', JSON.stringify(bezosProgress)), [bezosProgress]; });
-  useEffect(() => { localStorage.setItem('academy_evening_checks', JSON.stringify(eveningChecks)), [eveningChecks]; });
-  useEffect(() => { localStorage.setItem('academy_failures', JSON.stringify(failureLog)), [failureLog]; });
-  useEffect(() => { localStorage.setItem('academy_sprint_obj', sprintObjective), [sprintObjective]; });
+  useEffect(() => { localStorage.setItem('academy_capitals', JSON.stringify(capitals)); }, [capitals]);
+  useEffect(() => { localStorage.setItem('academy_gaps', JSON.stringify(gaps)); }, [gaps]);
+  useEffect(() => { localStorage.setItem('academy_bezos', JSON.stringify(bezosProgress)); }, [bezosProgress]);
+  useEffect(() => { localStorage.setItem('academy_evening_checks', JSON.stringify(eveningChecks)); }, [eveningChecks]);
+  useEffect(() => { localStorage.setItem('academy_failures', JSON.stringify(failureLog)); }, [failureLog]);
+  useEffect(() => { localStorage.setItem('academy_sprint_obj', sprintObjective); }, [sprintObjective]);
   useEffect(() => {
       if (sprintEndTime) localStorage.setItem('academy_sprint_end', sprintEndTime.toString());
       else localStorage.removeItem('academy_sprint_end');
