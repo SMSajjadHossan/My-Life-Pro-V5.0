@@ -6,10 +6,14 @@
     <title>MyLife Pro - The Life OS</title>
     <!-- Fonts: Space Grotesk (Headers), JetBrains Mono (Data), Inter (UI) -->
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS (CDN Mode for simplicity) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <!-- GOOGLE API SCRIPTS FOR DRIVE SYNC -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
+    
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -113,18 +117,18 @@
       /* Diamond Glassmorphism v3.0 - Optimized */
       .glass-panel {
         background: rgba(18, 18, 23, 0.75);
-        backdrop-filter: blur(16px); /* Reduced blur radius slightly for performance */
+        backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         border: 1px solid rgba(255, 255, 255, 0.08);
         box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.4);
         transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.3s ease, border 0.3s ease;
-        will-change: transform, backdrop-filter; /* Hardware acceleration hint */
+        will-change: transform, backdrop-filter;
       }
       
       .glass-panel-hover:hover {
         background: rgba(30, 30, 45, 0.9);
         border-color: rgba(255, 255, 255, 0.15);
-        transform: translateY(-2px); /* Subtle lift */
+        transform: translateY(-2px);
         box-shadow: 0 10px 40px -10px rgba(0,0,0,0.7);
       }
 
@@ -134,28 +138,25 @@
       .text-glow-blue { text-shadow: 0 0 15px rgba(41, 121, 255, 0.6); }
       .text-glow-gold { text-shadow: 0 0 15px rgba(255, 215, 0, 0.6); }
 
-      /* Animation Utilities */
       .animate-in {
         animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       }
       
-      /* Smooth transitions for interactive elements */
       button, a, input, select, textarea {
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       }
 
-      /* Focus Ring Polish */
       *:focus-visible {
         outline: 1px solid #2979FF;
         outline-offset: 2px;
       }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "react": "https://aistudiocdn.com/react@^19.2.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.32.0",
     "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
@@ -171,10 +172,8 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(registration => {
-            console.log('SW registered: ', registration);
-          }).catch(registrationError => {
-            console.log('SW registration failed: ', registrationError);
+          navigator.serviceWorker.register('/sw.js').catch(error => {
+            console.log('SW registration failed:', error);
           });
         });
       }
