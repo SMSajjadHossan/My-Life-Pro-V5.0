@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>MyLife Pro - The Life OS</title>
+    <!-- Fonts: Space Grotesk (Headers), JetBrains Mono (Data), Inter (UI) -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- GOOGLE API SCRIPTS FOR DRIVE SYNC -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              display: ['"Space Grotesk"', 'sans-serif'],
+              sans: ['Inter', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+            colors: {
+              obsidian: '#050507', // Deepest Black
+              void: '#0B0C10',     // Panel Background
+              glass: 'rgba(20, 20, 30, 0.6)', 
+              
+              // Neon Palette (Cyberpunk)
+              'spartan-red': '#FF2A2A', 
+              'wealth-green': '#00E676',
+              'gold': '#FFD700',
+              'electric-blue': '#2979FF',
+              'cyber-purple': '#D500F9',
+              
+              // Surface Colors
+              gray: {
+                850: '#1a1d24',
+                900: '#111318',
+                950: '#0B0C10',
+              },
+            },
+            animation: {
+              'blob': 'blob 20s infinite',
+              'fade-in': 'fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'scan': 'scan 4s linear infinite',
+            },
+            keyframes: {
+              blob: {
+                '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                '100%': { transform: 'translate(0px, 0px) scale(1)' },
+              },
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { opacity: '0', transform: 'translateY(15px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              scan: {
+                '0%': { backgroundPosition: '0% 0%' },
+                '100%': { backgroundPosition: '0% 100%' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        scroll-behavior: smooth;
+      }
+      
+      body {
+        background-color: #050507;
+        color: #e2e8f0;
+        overflow-x: hidden;
+        /* Maximum Font Rendering Quality */
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: geometricPrecision;
+      }
+      
+      /* Butter Smooth Selection */
+      ::selection {
+        background-color: rgba(41, 121, 255, 0.3);
+        color: #fff;
+        text-shadow: 0 0 10px rgba(41, 121, 255, 0.8);
+      }
+
+      /* Ultra-Thin Modern Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(0,0,0,0.3); 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155; 
+        border-radius: 3px;
+        transition: background 0.3s ease;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569; 
+      }
+
+      /* Diamond Glassmorphism v3.0 - Optimized */
+      .glass-panel {
+        background: rgba(18, 18, 23, 0.75);
+        backdrop-filter: blur(16px); /* Reduced blur radius slightly for performance */
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.4);
+        transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.3s ease, border 0.3s ease;
+        will-change: transform, backdrop-filter; /* Hardware acceleration hint */
+      }
+      
+      .glass-panel-hover:hover {
+        background: rgba(30, 30, 45, 0.9);
+        border-color: rgba(255, 255, 255, 0.15);
+        transform: translateY(-2px); /* Subtle lift */
+        box-shadow: 0 10px 40px -10px rgba(0,0,0,0.7);
+      }
+
+      /* Text Glow Utilities */
+      .text-glow-red { text-shadow: 0 0 15px rgba(255, 42, 42, 0.6); }
+      .text-glow-green { text-shadow: 0 0 15px rgba(0, 230, 118, 0.6); }
+      .text-glow-blue { text-shadow: 0 0 15px rgba(41, 121, 255, 0.6); }
+      .text-glow-gold { text-shadow: 0 0 15px rgba(255, 215, 0, 0.6); }
+
+      /* Animation Utilities */
+      .animate-in {
+        animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      
+      /* Smooth transitions for interactive elements */
+      button, a, input, select, textarea {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* Focus Ring Polish */
+      *:focus-visible {
+        outline: 1px solid #2979FF;
+        outline-offset: 2px;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.6",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>
