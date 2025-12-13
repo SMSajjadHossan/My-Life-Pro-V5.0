@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Terminal, Loader, ShieldAlert, Cpu, Zap, DollarSign, Briefcase, BookOpen, Skull, Flame } from 'lucide-react';
 import { chatWithGeneral } from '../services/geminiService';
@@ -275,17 +276,20 @@ export const WarRoom: React.FC<Props> = ({ financialData, habits, profile, objec
             ))}
             
             {isLoading && (
-                <div className="flex gap-4 animate-pulse">
-                     <div className="w-10 h-10 rounded-full flex items-center justify-center border bg-slate-900 border-gray-700 shadow-lg">
+                <div className="flex gap-4 animate-in fade-in">
+                     <div className="w-10 h-10 rounded-full flex items-center justify-center border bg-slate-900 border-gray-700 shadow-lg flex-shrink-0">
                         <Loader size={20} className="text-spartan-red animate-spin"/>
                     </div>
-                    <div className="bg-slate-900/50 border border-gray-800 rounded-lg p-4 flex items-center gap-3 rounded-tl-none">
-                        <div className="flex gap-1">
-                            <span className="w-2 h-2 bg-spartan-red rounded-full animate-bounce"></span>
-                            <span className="w-2 h-2 bg-spartan-red rounded-full animate-bounce animation-delay-200"></span>
-                            <span className="w-2 h-2 bg-spartan-red rounded-full animate-bounce animation-delay-400"></span>
+                    <div className="bg-slate-900/50 border border-gray-800 rounded-lg p-5 flex flex-col gap-3 rounded-tl-none max-w-[85%] w-full">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-bold text-spartan-red uppercase tracking-widest">The General</span>
+                            <span className="text-[10px] text-gray-600 font-mono animate-pulse">Thinking...</span>
                         </div>
-                        <span className="text-xs text-gray-500 font-mono uppercase tracking-widest">Decryption in progress...</span>
+                        <div className="space-y-2.5">
+                            <div className="h-2 bg-gray-800 rounded w-3/4 animate-pulse"></div>
+                            <div className="h-2 bg-gray-800 rounded w-1/2 animate-pulse"></div>
+                            <div className="h-2 bg-gray-800 rounded w-5/6 animate-pulse"></div>
+                        </div>
                     </div>
                 </div>
             )}

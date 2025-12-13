@@ -1,8 +1,12 @@
+
+// ... (imports remain the same)
 import React, { useState, useMemo, useEffect } from 'react';
 import { FinancialState, BusinessEntity, Transaction, Asset, LoanLiability, MonthlyBudgetSnapshot, MoneyMindsetLog } from '../types';
 import { INFLATION_RATE_BD, BUSINESS_STAGES, WEALTH_TIMELINE, SECRETS_OF_RICH_7, FLASH_CARDS } from '../constants';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Bar, BarChart, PieChart, Pie, Cell, Legend, ReferenceLine } from 'recharts';
-import { Activity, Crown, Building2, Rocket, Shield, Wallet, Save, Trash2, Edit3, LayoutDashboard, Plus, TrendingDown, AlertCircle, Settings, RefreshCw, X, ArrowUpRight, ArrowDownRight, TrendingUp, BookOpen, FileText, ClipboardList, Split, Landmark, Cloud, Upload, Download, HardDrive, DollarSign, Briefcase, Zap, Calculator, ArrowRight, Target, CheckCircle, Brain, Lock, Play, Pause, ChevronLeft, ChevronRight, Lightbulb, PiggyBank, GraduationCap, Scale, ListPlus } from 'lucide-react';
+import { Activity, Crown, Building2, Rocket, Shield, Wallet, Save, Trash2, Edit3, LayoutDashboard, Plus, TrendingDown, AlertCircle, Settings, RefreshCw, X, ArrowUpRight, ArrowDownRight, TrendingUp, BookOpen, FileText, ClipboardList, Split, Landmark, Cloud, Upload, Download, HardDrive, DollarSign, Briefcase, Zap, Calculator, ArrowRight, Target, CheckCircle, Brain, Lock, Play, Pause, ChevronLeft, ChevronRight, Lightbulb, PiggyBank, GraduationCap, Scale, ListPlus, Map, Sprout, Hammer, LineChart, Flag, Home, Percent } from 'lucide-react';
+
+// ... (rest of imports/interfaces/initial data)
 
 interface Props {
   data: FinancialState;
@@ -36,7 +40,7 @@ const INITIAL_JOURNAL_DATA: JournalData = {
 };
 
 export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
-  const [activeTab, setActiveTab] = useState<'COMMAND' | 'JOURNAL' | 'PORTFOLIO' | 'OFFENSE' | 'FIRE' | 'AUDIT' | 'BLUEPRINT'>('COMMAND');
+  const [activeTab, setActiveTab] = useState<'COMMAND' | 'ROADMAP' | 'JOURNAL' | 'PORTFOLIO' | 'OFFENSE' | 'FIRE' | 'AUDIT' | 'BLUEPRINT'>('COMMAND');
   const [fireChartMode, setFireChartMode] = useState<'WEALTH' | 'VELOCITY'>('WEALTH');
 
   // --- REALITY JOURNAL STATE (DYNAMIC) ---
@@ -141,11 +145,12 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
 
     const weightedRoiSum = safeAssets.reduce((acc, curr) => acc + (curr.value * (curr.roi || 0)), 0);
     const weightedAvgRoi = totalAssets > 0 ? weightedRoiSum / totalAssets : 0;
+    const annualPassiveIncome = safeAssets.reduce((acc, curr) => acc + (curr.value * (curr.roi/100)), 0);
 
     const totalGuiltFreeSpent = safeLogs.reduce((acc, curr) => acc + (curr.guiltFreeSpent || 0), 0);
     const guiltFreeBudget = income * 0.10; 
 
-    return { totalAssets, totalDebt, businessValuation, liquidCash, realNetWorth, grossNetWorth, income, expenses, savingsRate, burnRate, runway, weightedAvgRoi, guiltFreeBudget, totalGuiltFreeSpent, dailyInflationLoss };
+    return { totalAssets, totalDebt, businessValuation, liquidCash, realNetWorth, grossNetWorth, income, expenses, savingsRate, burnRate, runway, weightedAvgRoi, guiltFreeBudget, totalGuiltFreeSpent, dailyInflationLoss, annualPassiveIncome };
   }, [data]);
 
   // --- 2. STATE MANAGEMENT ---
@@ -178,7 +183,25 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
   const [snapshotForm, setSnapshotForm] = useState<{ id?: string; month: string; income: string; dependents: string; essential: string; nonEssential: string; notes: string; }>({ month: new Date().toISOString().slice(0, 7), income: '', dependents: '0', essential: '', nonEssential: '', notes: '' });
   const [isEditingSnapshot, setIsEditingSnapshot] = useState(false);
   const [journalForm, setJournalForm] = useState<MoneyMindsetLog>({ id: '', date: new Date().toISOString().split('T')[0], patternProblem: '', identifyTrigger: '', solveAction: '', guiltFreeSpent: 0, notes: '' });
-  const [fireInputs, setFireInputs] = useState({ monthlySip: '5000', lumpsum: '100000', inflation: '8.5', returnRate: '12', target: '10000000', years: '15' });
+  
+  // UPDATED FIRE INPUTS: Added taxRate, type checking and persistence
+  const [fireInputs, setFireInputs] = useState(() => {
+      const saved = localStorage.getItem('wealth_fire_inputs_v2');
+      return saved ? JSON.parse(saved) : { 
+          monthlySip: '5000', 
+          lumpsum: '100000', 
+          inflation: '8.5', 
+          returnRate: '12', 
+          taxRate: '10', // Default 10% Capital Gains Tax
+          target: '10000000', 
+          years: '15' 
+      };
+  });
+
+  useEffect(() => {
+      localStorage.setItem('wealth_fire_inputs_v2', JSON.stringify(fireInputs));
+  }, [fireInputs]);
+  
   const [showReconcile, setShowReconcile] = useState(false);
   const [reconcileValues, setReconcileValues] = useState({ A: '', B: '', C: '' });
 
@@ -288,6 +311,11 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
       updateData({ ...data, bankA: newA, bankB: newB, bankC: newC });
       setShowReconcile(false);
       setReconcileValues({ A: '', B: '', C: '' });
+  };
+
+  const updateRoadmap = (field: string, value: any) => {
+      const currentSettings = data.roadmapSettings || { targetMonthlyExpense: metrics.burnRate, sipAmount: 0, hasStartedSIP: false, activePhase: 1 };
+      updateData({ ...data, roadmapSettings: { ...currentSettings, [field]: value } });
   };
 
   const getFinancialClass = (ppi: number) => {
@@ -577,7 +605,7 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
         {/* RECONCILIATION MODAL */}
         {showReconcile && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-slate-900 border border-gray-700 p-6 rounded-lg w-96 shadow-2xl relative">
+                <div className="bg-slate-950 border border-gray-700 p-6 rounded-lg w-96 shadow-2xl relative">
                     <button onClick={() => setShowReconcile(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={16}/></button>
                     <h3 className="text-sm font-bold text-white uppercase mb-4 flex items-center gap-2"><RefreshCw size={14} className="text-blue-500"/> System Override</h3>
                     <div className="space-y-4">
@@ -600,6 +628,173 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
         )}
     </div>
   );
+
+  const renderRoadmap = () => {
+      const settings = data.roadmapSettings || { targetMonthlyExpense: metrics.burnRate || 20000, sipAmount: 0, hasStartedSIP: false, activePhase: 1 };
+      
+      const monthlyExpense = settings.targetMonthlyExpense;
+      const survivalScore = monthlyExpense > 0 ? metrics.liquidCash / monthlyExpense : 0;
+      
+      const shieldTarget = monthlyExpense * 6;
+      const shieldProgress = Math.min(100, (metrics.liquidCash / shieldTarget) * 100);
+      
+      const currentPhase = survivalScore < 6 ? 2 : settings.hasStartedSIP ? 4 : 3;
+      const activeStepColor = (step: number) => currentPhase >= step ? 'text-wealth-green' : 'text-gray-600';
+      const activeStepBg = (step: number) => currentPhase >= step ? 'bg-wealth-green/20 border-wealth-green' : 'bg-black border-gray-800';
+
+      return (
+          <div className="space-y-6 animate-in fade-in">
+              {/* HERO: SURVIVAL SCORE */}
+              <div className="glass-panel p-8 rounded-lg relative overflow-hidden text-center border-b-4 border-wealth-green">
+                  <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-2">CURRENT SURVIVAL SCORE</p>
+                  <h1 className="text-6xl font-black text-white font-mono tracking-tighter mb-2">
+                      {survivalScore.toFixed(1)} <span className="text-lg text-gray-500">MONTHS</span>
+                  </h1>
+                  <p className={`text-sm font-bold uppercase ${survivalScore < 6 ? 'text-spartan-red' : 'text-wealth-green'}`}>
+                      {survivalScore < 6 ? "⚠️ DANGER ZONE: BUILD SHIELD" : "✅ SECURE: PLANT SEEDS"}
+                  </p>
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><Map size={120} className="text-white"/></div>
+              </div>
+
+              {/* THE 5 STEPS */}
+              <div className="grid grid-cols-1 gap-4">
+                  {/* STEP 1: REALITY CHECK */}
+                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(1)}`}>
+                      <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3">
+                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">01</div>
+                              <h3 className="text-lg font-bold text-white uppercase">Reality Check</h3>
+                          </div>
+                          {survivalScore > 0 && <CheckCircle className="text-wealth-green" size={20}/>}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                              <p className="text-[10px] text-gray-500 uppercase font-bold">Liquid Cash (Actual)</p>
+                              <p className="text-xl font-mono text-white font-bold">৳ {metrics.liquidCash.toLocaleString()}</p>
+                          </div>
+                          <div>
+                              <p className="text-[10px] text-gray-500 uppercase font-bold">Monthly Expense (Target)</p>
+                              <input 
+                                  type="number" 
+                                  value={settings.targetMonthlyExpense}
+                                  onChange={(e) => updateRoadmap('targetMonthlyExpense', parseFloat(e.target.value))}
+                                  className="bg-black border border-gray-700 text-white font-mono p-1 rounded w-full outline-none focus:border-blue-500"
+                              />
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* STEP 2: BUILD SHIELD */}
+                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(2)}`}>
+                      <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3">
+                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">02</div>
+                              <h3 className="text-lg font-bold text-white uppercase">Build Shield (Emergency Fund)</h3>
+                          </div>
+                          <Shield className={survivalScore < 6 ? "text-spartan-red animate-pulse" : "text-wealth-green"} size={20}/>
+                      </div>
+                      <div className="mb-2 flex justify-between text-xs text-gray-400">
+                          <span>Target (6 Months): ৳ {shieldTarget.toLocaleString()}</span>
+                          <span>{shieldProgress.toFixed(0)}%</span>
+                      </div>
+                      <div className="h-2 bg-black rounded-full overflow-hidden mb-4 border border-gray-800">
+                          <div className="h-full bg-spartan-red transition-all duration-1000" style={{width: `${shieldProgress}%`}}></div>
+                      </div>
+                      {survivalScore < 6 && (
+                          <div className="bg-red-900/20 border border-red-900/50 p-3 rounded text-center">
+                              <p className="text-xs text-red-400 font-bold uppercase">🛑 STOP LUXURY SPENDING. FOCUS ONLY ON SAVING.</p>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* STEP 3: PLANT SEEDS */}
+                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(3)}`}>
+                      <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3">
+                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">03</div>
+                              <h3 className="text-lg font-bold text-white uppercase">Plant Seeds (Automation)</h3>
+                          </div>
+                          <Sprout className={settings.hasStartedSIP ? "text-wealth-green" : "text-gray-500"} size={20}/>
+                      </div>
+                      <div className="flex flex-col md:flex-row gap-4 items-center">
+                          <div className="flex-1 w-full">
+                              <label className="text-[10px] text-gray-500 uppercase font-bold">Monthly SIP Amount</label>
+                              <input 
+                                  type="number" 
+                                  value={settings.sipAmount}
+                                  onChange={(e) => updateRoadmap('sipAmount', parseFloat(e.target.value))}
+                                  placeholder="e.g. 5000"
+                                  className="w-full bg-black border border-gray-700 p-2 rounded text-white font-mono mt-1"
+                              />
+                          </div>
+                          <button 
+                              onClick={() => updateRoadmap('hasStartedSIP', !settings.hasStartedSIP)}
+                              className={`px-4 py-2 rounded text-xs font-bold uppercase border w-full md:w-auto mt-4 md:mt-0 ${settings.hasStartedSIP ? 'bg-wealth-green text-black border-wealth-green' : 'bg-black text-gray-500 border-gray-700 hover:text-white'}`}
+                          >
+                              {settings.hasStartedSIP ? "SIP Active ✅" : "Mark Active"}
+                          </button>
+                      </div>
+                  </div>
+
+                  {/* STEP 4: BUILD ASSETS */}
+                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(4)}`}>
+                      <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3">
+                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">04</div>
+                              <h3 className="text-lg font-bold text-white uppercase">Build Assets</h3>
+                          </div>
+                          <Hammer className="text-blue-500" size={20}/>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="bg-black p-3 rounded border border-gray-800">
+                              <Cloud size={20} className="mx-auto text-blue-400 mb-2"/>
+                              <p className="text-[10px] text-gray-300 font-bold uppercase">Digital</p>
+                              <p className="text-[9px] text-gray-600">E-books, Courses</p>
+                          </div>
+                          <div className="bg-black p-3 rounded border border-gray-800">
+                              <LineChart size={20} className="mx-auto text-wealth-green mb-2"/>
+                              <p className="text-[10px] text-gray-300 font-bold uppercase">Financial</p>
+                              <p className="text-[9px] text-gray-600">Stocks, FDR</p>
+                          </div>
+                          <div className="bg-black p-3 rounded border border-gray-800">
+                              <Home size={20} className="mx-auto text-amber-500 mb-2"/>
+                              <p className="text-[10px] text-gray-300 font-bold uppercase">Physical</p>
+                              <p className="text-[9px] text-gray-600">Equipment, Room</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setActiveTab('OFFENSE')} className="w-full mt-4 text-xs bg-blue-900/20 text-blue-400 border border-blue-900 py-2 rounded hover:bg-blue-900/40 uppercase font-bold">
+                          Go to Business Builder
+                      </button>
+                  </div>
+
+                  {/* STEP 5: SCALE UP */}
+                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(5)}`}>
+                      <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3">
+                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">05</div>
+                              <h3 className="text-lg font-bold text-white uppercase">Financial Freedom</h3>
+                          </div>
+                          <Flag className="text-gold" size={20}/>
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-sm mb-2">
+                          <span className="text-gray-400">Passive Income</span>
+                          <span className="text-white font-mono font-bold">৳ {Math.round(metrics.annualPassiveIncome / 12).toLocaleString()}/mo</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm mb-4">
+                          <span className="text-gray-400">Monthly Expense</span>
+                          <span className="text-white font-mono font-bold">৳ {settings.targetMonthlyExpense.toLocaleString()}</span>
+                      </div>
+                      
+                      <div className="h-4 bg-black rounded-full overflow-hidden border border-gray-800 relative">
+                          <div className="absolute top-0 left-0 h-full bg-gold z-10" style={{width: `${Math.min(100, ((metrics.annualPassiveIncome/12) / settings.targetMonthlyExpense) * 100)}%`}}></div>
+                      </div>
+                      <p className="text-center text-[10px] text-gray-500 mt-2 uppercase font-bold">Target: Passive > Expenses</p>
+                  </div>
+              </div>
+          </div>
+      );
+  };
 
   const renderPortfolio = () => (
       <div className="space-y-6 animate-in fade-in">
@@ -695,6 +890,382 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
       </div>
   );
 
+  const renderFire = () => {
+    const monthlySip = parseFloat(fireInputs.monthlySip) || 0;
+    const lumpsum = parseFloat(fireInputs.lumpsum) || 0;
+    const years = parseInt(fireInputs.years) || 1;
+    const annualReturn = parseFloat(fireInputs.returnRate) || 0;
+    const annualInflation = parseFloat(fireInputs.inflation) || 0;
+    const taxRate = parseFloat(fireInputs.taxRate) || 0; // Tax input
+    const targetRealWealth = parseFloat(fireInputs.target) || 0;
+
+    const months = years * 12;
+    const monthlyReturnRate = (annualReturn / 100) / 12;
+    const monthlyTaxRate = (taxRate / 100); // Apply tax to gains
+    
+    const projectionData = [];
+    let currentNominal = 0;
+    let totalInvested = 0;
+    let totalTaxPaid = 0;
+
+    for (let m = 1; m <= months; m++) {
+        let investmentThisMonth = monthlySip;
+        if (m === 2) investmentThisMonth += lumpsum;
+
+        const opening = currentNominal;
+        const grossInterest = (opening + investmentThisMonth) * monthlyReturnRate;
+        const taxAmount = grossInterest * monthlyTaxRate; // Tax on monthly gain (simplified)
+        const netInterest = grossInterest - taxAmount;
+        
+        const closing = opening + investmentThisMonth + netInterest;
+        
+        currentNominal = closing;
+        totalInvested += investmentThisMonth;
+        totalTaxPaid += taxAmount;
+
+        const yearsPassed = m / 12;
+        const inflationFactor = Math.pow(1 + (annualInflation/100), yearsPassed);
+        const realWealth = currentNominal / inflationFactor;
+
+        if (m % 12 === 0 || m === months) {
+            projectionData.push({
+                year: (m / 12).toFixed(1),
+                month: m,
+                invested: Math.round(totalInvested),
+                nominal: Math.round(currentNominal),
+                real: Math.round(realWealth),
+                inflationFactor: inflationFactor.toFixed(2),
+                monthlyInterest: Math.round(netInterest),
+                monthlyContribution: Math.round(investmentThisMonth)
+            });
+        }
+    }
+
+    const finalNominal = currentNominal;
+    const finalReal = currentNominal / Math.pow(1 + (annualInflation/100), years);
+    const inflationLoss = finalNominal - finalReal;
+
+    return (
+    <div className="space-y-6 animate-in fade-in">
+        <div className="glass-panel p-6 rounded-lg">
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <div>
+                    <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
+                        <Rocket className="text-gold"/> Wealth Projection Engine
+                    </h3>
+                    <span className="text-xs font-mono text-gray-500">YEARS: {years} • TARGET: ৳{(targetRealWealth/100000).toFixed(1)}L (Real)</span>
+                </div>
+                <div className="flex bg-black p-1 rounded border border-gray-800">
+                    <button 
+                        onClick={() => setFireChartMode('WEALTH')}
+                        className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${fireChartMode === 'WEALTH' ? 'bg-slate-800 text-white shadow' : 'text-gray-500'}`}
+                    >
+                        Wealth View
+                    </button>
+                    <button 
+                        onClick={() => setFireChartMode('VELOCITY')}
+                        className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${fireChartMode === 'VELOCITY' ? 'bg-slate-800 text-white shadow' : 'text-gray-500'}`}
+                    >
+                        Velocity View
+                    </button>
+                </div>
+             </div>
+             
+             {/* INPUTS GRID */}
+             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mb-6">
+                 <div>
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Monthly SIP</label>
+                    <input type="number" value={fireInputs.monthlySip} onChange={e => setFireInputs({...fireInputs, monthlySip: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
+                 </div>
+                 <div>
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Lumpsum (Mo 2)</label>
+                    <input type="number" value={fireInputs.lumpsum} onChange={e => setFireInputs({...fireInputs, lumpsum: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
+                 </div>
+                 <div>
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Return (%)</label>
+                    <input type="number" value={fireInputs.returnRate} onChange={e => setFireInputs({...fireInputs, returnRate: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
+                 </div>
+                 <div>
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Inflation (%)</label>
+                    <input type="number" value={fireInputs.inflation} onChange={e => setFireInputs({...fireInputs, inflation: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 text-red-400 font-bold focus:border-red-500 outline-none"/>
+                 </div>
+                 <div>
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Tax Rate (%)</label>
+                    <input type="number" value={fireInputs.taxRate} onChange={e => setFireInputs({...fireInputs, taxRate: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 text-orange-400 font-bold focus:border-orange-500 outline-none"/>
+                 </div>
+                 <div>
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Target (Real)</label>
+                    <input type="number" value={fireInputs.target} onChange={e => setFireInputs({...fireInputs, target: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
+                 </div>
+                 <div>
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">Duration (Yrs)</label>
+                    <input type="number" value={fireInputs.years} onChange={e => setFireInputs({...fireInputs, years: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
+                 </div>
+             </div>
+
+             {/* IMPACT SUMMARY */}
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                 <div className="bg-black border border-gray-800 p-3 rounded">
+                     <p className="text-[10px] text-gray-500 uppercase font-bold">Projected Wealth (Real)</p>
+                     <p className="text-lg font-mono font-bold text-wealth-green">৳ {(finalReal/100000).toFixed(2)}L</p>
+                 </div>
+                 <div className="bg-black border border-gray-800 p-3 rounded">
+                     <p className="text-[10px] text-gray-500 uppercase font-bold">Nominal Value (Bank)</p>
+                     <p className="text-lg font-mono font-bold text-amber-500">৳ {(finalNominal/100000).toFixed(2)}L</p>
+                 </div>
+                 <div className="bg-black border border-gray-800 p-3 rounded">
+                     <p className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1"><TrendingDown size={10} className="text-red-500"/> Inflation Loss</p>
+                     <p className="text-lg font-mono font-bold text-red-500">-৳ {(inflationLoss/100000).toFixed(2)}L</p>
+                 </div>
+                 <div className="bg-black border border-gray-800 p-3 rounded">
+                     <p className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1"><Percent size={10} className="text-orange-500"/> Est. Tax Paid</p>
+                     <p className="text-lg font-mono font-bold text-orange-500">-৳ {(totalTaxPaid/100000).toFixed(2)}L</p>
+                 </div>
+             </div>
+
+             {/* CHART SECTION */}
+             <div className="bg-black border border-gray-800 p-4 rounded-lg h-72 mb-6">
+                <ResponsiveContainer width="100%" height="100%">
+                    {fireChartMode === 'WEALTH' ? (
+                        <AreaChart data={projectionData}>
+                            <defs>
+                                <linearGradient id="colorNominal" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <XAxis dataKey="year" stroke="#94a3b8" tick={{fontSize: 10}} label={{ value: 'Years', position: 'insideBottomRight', offset: -5 }}/>
+                            <YAxis stroke="#94a3b8" tick={{fontSize: 10}} tickFormatter={v => `${(v/100000).toFixed(0)}L`}/>
+                            <Tooltip contentStyle={{backgroundColor: '#000', borderColor: '#333', borderRadius: '8px'}} formatter={(v: number) => `৳ ${v.toLocaleString()}`}/>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#444"/>
+                            <ReferenceLine y={targetRealWealth} label="Target Real" stroke="red" strokeDasharray="3 3" />
+                            
+                            <Area type="monotone" dataKey="nominal" stroke="#F59E0B" fillOpacity={1} fill="url(#colorNominal)" name="Nominal Wealth (Bank Balance)" animationDuration={1500}/>
+                            <Area type="monotone" dataKey="real" stroke="#10B981" fillOpacity={1} fill="url(#colorReal)" name="Real Wealth (Purchasing Power)" animationDuration={1500}/>
+                            <Legend />
+                        </AreaChart>
+                    ) : (
+                        <BarChart data={projectionData}>
+                            <XAxis dataKey="year" stroke="#94a3b8" tick={{fontSize: 10}} />
+                            <YAxis stroke="#94a3b8" tick={{fontSize: 10}} tickFormatter={v => `৳${v}`} />
+                            <Tooltip contentStyle={{backgroundColor: '#000', borderColor: '#333', borderRadius: '8px'}} formatter={(v: number) => `৳ ${v.toLocaleString()}`}/>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#444"/>
+                            <Legend />
+                            <Bar dataKey="monthlyContribution" name="Monthly Investment" fill="#3B82F6" stackId="a" animationDuration={1500} />
+                            <Bar dataKey="monthlyInterest" name="Monthly Growth (Post-Tax)" fill="#10B981" stackId="a" animationDuration={1500} />
+                        </BarChart>
+                    )}
+                </ResponsiveContainer>
+             </div>
+        </div>
+    </div>
+  )};
+
+  const renderOffense = () => (
+    <div className="space-y-6 animate-in fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* BUSINESS FORM */}
+            <div className="glass-panel p-6 rounded-lg">
+                <div className="flex justify-between items-center mb-4">
+                     <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
+                        <Building2 className="text-blue-500"/> Business Builder
+                     </h3>
+                     {isEditingBiz && <button onClick={() => {setIsEditingBiz(false); setBizForm({name:'', revenue:'', valuation:'', stage:1})}} className="text-xs text-red-500">Cancel</button>}
+                </div>
+                
+                <div className="space-y-3">
+                    <input value={bizForm.name} onChange={e => setBizForm({...bizForm, name: e.target.value})} placeholder="Venture Name" className="w-full bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
+                    <div className="flex gap-2">
+                        <input type="number" value={bizForm.revenue} onChange={e => setBizForm({...bizForm, revenue: e.target.value})} placeholder="Monthly Rev" className="w-1/2 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
+                        <input type="number" value={bizForm.valuation} onChange={e => setBizForm({...bizForm, valuation: e.target.value})} placeholder="Valuation" className="w-1/2 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-gray-500 uppercase mb-1">Growth Stage</p>
+                        <div className="flex gap-1">
+                            {[1,2,3,4,5].map(s => (
+                                <button key={s} onClick={() => setBizForm({...bizForm, stage: s})} className={`flex-1 py-2 text-xs font-bold rounded border ${bizForm.stage === s ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-800 text-gray-500 hover:bg-gray-800'}`}>{s}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <button onClick={handleSaveBusiness} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded text-xs uppercase tracking-widest mt-2 shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">
+                        {isEditingBiz ? "Update Venture" : "Launch Venture"}
+                    </button>
+                </div>
+            </div>
+
+            {/* VENTURE LIST */}
+            <div className="space-y-3">
+                {(data.businesses || []).map(biz => (
+                    <div key={biz.id} className="bg-black border border-gray-800 p-4 rounded-lg group relative hover:border-blue-500 transition-all hover:-translate-y-1">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h4 className="font-bold text-white text-lg">{biz.name}</h4>
+                                <p className="text-xs text-blue-500 uppercase font-bold">Stage {biz.stage}: {BUSINESS_STAGES[biz.stage-1]?.goal}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xl font-mono text-white font-bold">৳ {biz.valuation.toLocaleString()}</p>
+                                <p className="text-[10px] text-gray-500 uppercase">Valuation</p>
+                            </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between items-center">
+                            <p className="text-xs text-gray-500">Monthly Rev: <span className="text-wealth-green font-mono">৳ {biz.monthlyRevenue.toLocaleString()}</span></p>
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => startEditBusiness(biz)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14}/></button>
+                                <button onClick={() => handleDeleteBusiness(biz.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                {(data.businesses || []).length === 0 && (
+                    <div className="h-full flex items-center justify-center border border-dashed border-gray-800 rounded-lg text-gray-500 text-xs italic">
+                        No active ventures. Start building.
+                    </div>
+                )}
+            </div>
+        </div>
+    </div>
+  );
+
+  const renderAudit = () => {
+    const snapshots = [...(data.budgetSnapshots || [])].sort((a,b) => b.month.localeCompare(a.month));
+    const sortedSnapshots = [...(data.budgetSnapshots || [])].sort((a, b) => a.month.localeCompare(b.month));
+    const auditChartData = sortedSnapshots.map(s => ({
+        month: s.month,
+        income: s.income,
+        expense: s.essentialExpenses + s.nonEssentialExpenses,
+        savings: s.income - (s.essentialExpenses + s.nonEssentialExpenses)
+    }));
+
+    return (
+    <div className="space-y-6 animate-in fade-in">
+        {/* INPUT FORM */}
+        <div className="glass-panel p-6 rounded-lg">
+            <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
+                    <ClipboardList className="text-blue-500"/> Monthly Audit Record
+                 </h3>
+                 {isEditingSnapshot && <button onClick={() => {setIsEditingSnapshot(false); setSnapshotForm({month: new Date().toISOString().slice(0, 7), income: '', dependents: '0', essential: '', nonEssential: '', notes: ''})}} className="text-xs text-red-500">Cancel</button>}
+            </div>
+
+            <div className="space-y-4">
+                <div className="flex gap-4">
+                     <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Month</label>
+                        <input type="month" value={snapshotForm.month} onChange={e => setSnapshotForm({...snapshotForm, month: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
+                     </div>
+                     <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Income</label>
+                        <input type="number" value={snapshotForm.income} onChange={e => setSnapshotForm({...snapshotForm, income: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
+                     </div>
+                     <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Dependents</label>
+                        <input type="number" value={snapshotForm.dependents} onChange={e => setSnapshotForm({...snapshotForm, dependents: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
+                     </div>
+                </div>
+                <div className="flex gap-4">
+                     <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Essential Exp</label>
+                        <input type="number" value={snapshotForm.essential} onChange={e => setSnapshotForm({...snapshotForm, essential: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
+                     </div>
+                     <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Non-Essential Exp</label>
+                        <input type="number" value={snapshotForm.nonEssential} onChange={e => setSnapshotForm({...snapshotForm, nonEssential: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
+                     </div>
+                     <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 uppercase font-bold">Notes</label>
+                        <input type="text" value={snapshotForm.notes} onChange={e => setSnapshotForm({...snapshotForm, notes: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
+                     </div>
+                </div>
+                <button onClick={handleSaveSnapshot} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">
+                    {isEditingSnapshot ? "Update Snapshot" : "Log Month"}
+                </button>
+            </div>
+        </div>
+
+        {/* AUDIT TABLE */}
+        <div className="glass-panel rounded-lg overflow-hidden">
+             <div className="p-4 border-b border-gray-800">
+                <h3 className="text-sm font-bold text-white uppercase">Historical Performance</h3>
+             </div>
+             <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-gray-400">
+                    <thead className="bg-black text-gray-500 uppercase font-bold">
+                        <tr>
+                            <th className="p-3">Month</th>
+                            <th className="p-3 text-right">Income</th>
+                            <th className="p-3 text-center">People</th>
+                            <th className="p-3 text-right">PPI / Class</th>
+                            <th className="p-3 text-right">Expenses</th>
+                            <th className="p-3 text-right">Savings</th>
+                            <th className="p-3">Notes</th>
+                            <th className="p-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800">
+                        {snapshots.map((s, index) => {
+                            const totalPeople = (s.dependents || 0) + 1;
+                            const ppi = s.income / totalPeople;
+                            const totalExp = (s.essentialExpenses || 0) + (s.nonEssentialExpenses || 0);
+                            const savings = s.income - totalExp;
+                            const financialClass = getFinancialClass(ppi);
+                            const prev = snapshots[index + 1];
+                            const incomeTrend = prev ? (s.income >= prev.income ? 'UP' : 'DOWN') : 'FLAT';
+                            const expenseTrend = prev ? ((totalExp <= (prev.essentialExpenses + prev.nonEssentialExpenses)) ? 'BETTER' : 'WORSE') : 'FLAT';
+                            const savingsTrend = prev ? (savings >= (prev.income - (prev.essentialExpenses + prev.nonEssentialExpenses)) ? 'UP' : 'DOWN') : 'FLAT';
+
+                            return (
+                            <tr key={s.id} className="hover:bg-slate-900/50 group transition-colors">
+                                <td className="p-3 font-mono text-white">{s.month}</td>
+                                <td className="p-3 text-right font-mono text-white">
+                                    <div className="flex items-center justify-end gap-1">
+                                        {incomeTrend === 'UP' && <TrendingUp size={12} className="text-green-500"/>}
+                                        {incomeTrend === 'DOWN' && <TrendingDown size={12} className="text-red-500"/>}
+                                        {s.income.toLocaleString()}
+                                    </div>
+                                </td>
+                                <td className="p-3 text-center">{totalPeople}</td>
+                                <td className="p-3 text-right">
+                                    <div className="flex flex-col items-end">
+                                        <span className="font-mono text-white">৳ {Math.round(ppi).toLocaleString()}</span>
+                                        <span className={`text-[9px] uppercase font-bold ${financialClass.color}`}>{financialClass.label}</span>
+                                    </div>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                    <div className="flex items-center justify-end gap-1">
+                                        {expenseTrend === 'BETTER' && <TrendingDown size={12} className="text-green-500"/>}
+                                        {expenseTrend === 'WORSE' && <TrendingUp size={12} className="text-red-500"/>}
+                                        {totalExp.toLocaleString()}
+                                    </div>
+                                    <span className="text-[9px] text-gray-500 block">{s.essentialExpenses} Ess • {s.nonEssentialExpenses} Non</span>
+                                </td>
+                                <td className={`p-3 text-right font-mono font-bold ${savings > 0 ? 'text-wealth-green' : 'text-red-500'}`}>
+                                    <div className="flex items-center justify-end gap-1">
+                                         {savingsTrend === 'UP' && <TrendingUp size={12} className="text-green-500"/>}
+                                         {savingsTrend === 'DOWN' && <TrendingDown size={12} className="text-red-500"/>}
+                                         {savings.toLocaleString()}
+                                    </div>
+                                </td>
+                                <td className="p-3 truncate max-w-[150px]">{s.notes}</td>
+                                <td className="p-3 text-right">
+                                    <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => startEditSnapshot(s)} className="text-blue-500 hover:text-blue-400"><Edit3 size={14}/></button>
+                                        <button onClick={() => handleDeleteSnapshot(s.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        )})}
+                        {snapshots.length === 0 && <tr className="text-center"><td colSpan={8} className="p-6 italic">No monthly audits found.</td></tr>}
+                    </tbody>
+                </table>
+             </div>
+        </div>
+    </div>
+  )};
+
   const renderBlueprint = () => (
     <div className="space-y-6 animate-in fade-in">
         {/* HERO CARD */}
@@ -718,33 +1289,33 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
 
         {/* 2. WEALTH TIMELINE & 7 SECRETS */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
+            <div className="glass-panel p-6 rounded-lg shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                     <Target className="text-gold" />
-                    <h3 className="font-bold text-gray-900 dark:text-white uppercase">Wealth Timeline</h3>
+                    <h3 className="font-bold text-white uppercase">Wealth Timeline</h3>
                 </div>
                 <div className="space-y-4">
                     {WEALTH_TIMELINE.map((t, i) => (
                         <div key={i} className="flex gap-4 group">
-                            <div className="w-16 text-right font-mono text-amber-600 dark:text-gold font-bold group-hover:scale-110 transition-transform">{t.age}</div>
-                            <div className="flex-1 pb-4 border-l border-gray-300 dark:border-gray-700 pl-4 relative">
-                                <div className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-amber-600 dark:bg-gold group-hover:shadow-[0_0_10px_#FFD700] transition-shadow"></div>
-                                <p className="text-gray-900 dark:text-white font-bold text-xs uppercase mb-1">{t.focus}</p>
-                                <p className="text-gray-600 dark:text-gray-400 text-sm leading-snug">{t.action}</p>
+                            <div className="w-16 text-right font-mono text-gold font-bold group-hover:scale-110 transition-transform">{t.age}</div>
+                            <div className="flex-1 pb-4 border-l border-gray-700 pl-4 relative">
+                                <div className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-gold group-hover:shadow-[0_0_10px_#FFD700] transition-shadow"></div>
+                                <p className="text-white font-bold text-xs uppercase mb-1">{t.focus}</p>
+                                <p className="text-gray-400 text-sm leading-snug">{t.action}</p>
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
+            <div className="glass-panel p-6 rounded-lg shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                     <Lock className="text-blue-500" />
-                    <h3 className="font-bold text-gray-900 dark:text-white uppercase">7 Secrets of the Rich</h3>
+                    <h3 className="font-bold text-white uppercase">7 Secrets of the Rich</h3>
                 </div>
                 <ul className="space-y-3">
                     {SECRETS_OF_RICH_7.map((s, i) => (
-                        <li key={i} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2 hover:bg-white/5 p-2 rounded transition-colors">
+                        <li key={i} className="text-sm text-gray-300 flex items-start gap-2 hover:bg-white/5 p-2 rounded transition-colors">
                             <CheckCircle size={14} className="text-blue-500 mt-0.5 flex-shrink-0"/>
                             <span>{s}</span>
                         </li>
@@ -989,347 +1560,6 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
       </div>
   );
 
-  const renderFire = () => {
-    const monthlySip = parseFloat(fireInputs.monthlySip) || 0;
-    const lumpsum = parseFloat(fireInputs.lumpsum) || 0;
-    const years = parseInt(fireInputs.years) || 1;
-    const annualReturn = parseFloat(fireInputs.returnRate) || 0;
-    const annualInflation = parseFloat(fireInputs.inflation) || 0;
-    const targetRealWealth = parseFloat(fireInputs.target) || 0;
-
-    const months = years * 12;
-    const monthlyReturnRate = (annualReturn / 100) / 12;
-    
-    const projectionData = [];
-    let currentNominal = 0;
-    let totalInvested = 0;
-
-    for (let m = 1; m <= months; m++) {
-        let investmentThisMonth = monthlySip;
-        if (m === 2) investmentThisMonth += lumpsum;
-
-        const opening = currentNominal;
-        const interest = (opening + investmentThisMonth) * monthlyReturnRate;
-        const closing = opening + investmentThisMonth + interest;
-        
-        currentNominal = closing;
-        totalInvested += investmentThisMonth;
-
-        const yearsPassed = m / 12;
-        const inflationFactor = Math.pow(1 + (annualInflation/100), yearsPassed);
-        const realWealth = currentNominal / inflationFactor;
-
-        if (m % 12 === 0 || m === months) {
-            projectionData.push({
-                year: (m / 12).toFixed(1),
-                month: m,
-                invested: Math.round(totalInvested),
-                nominal: Math.round(currentNominal),
-                real: Math.round(realWealth),
-                inflationFactor: inflationFactor.toFixed(2),
-                monthlyInterest: Math.round(interest),
-                monthlyContribution: Math.round(investmentThisMonth)
-            });
-        }
-    }
-
-    return (
-    <div className="space-y-6 animate-in fade-in">
-        <div className="glass-panel p-6 rounded-lg">
-             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <div>
-                    <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
-                        <Rocket className="text-gold"/> Wealth Projection Engine
-                    </h3>
-                    <span className="text-xs font-mono text-gray-500">YEARS: {years} • TARGET: ৳{(targetRealWealth/100000).toFixed(1)}L (Real)</span>
-                </div>
-                <div className="flex bg-black p-1 rounded border border-gray-800">
-                    <button 
-                        onClick={() => setFireChartMode('WEALTH')}
-                        className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${fireChartMode === 'WEALTH' ? 'bg-slate-800 text-white shadow' : 'text-gray-500'}`}
-                    >
-                        Wealth View
-                    </button>
-                    <button 
-                        onClick={() => setFireChartMode('VELOCITY')}
-                        className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${fireChartMode === 'VELOCITY' ? 'bg-slate-800 text-white shadow' : 'text-gray-500'}`}
-                    >
-                        Velocity View
-                    </button>
-                </div>
-             </div>
-             
-             {/* INPUTS GRID */}
-             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Monthly SIP</label>
-                    <input value={fireInputs.monthlySip} onChange={e => setFireInputs({...fireInputs, monthlySip: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Lumpsum (Mo 2)</label>
-                    <input value={fireInputs.lumpsum} onChange={e => setFireInputs({...fireInputs, lumpsum: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Return (%)</label>
-                    <input value={fireInputs.returnRate} onChange={e => setFireInputs({...fireInputs, returnRate: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Inflation (%)</label>
-                    <input value={fireInputs.inflation} onChange={e => setFireInputs({...fireInputs, inflation: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 text-red-400 font-bold focus:border-red-500 outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Target (Real)</label>
-                    <input value={fireInputs.target} onChange={e => setFireInputs({...fireInputs, target: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Duration (Yrs)</label>
-                    <input value={fireInputs.years} onChange={e => setFireInputs({...fireInputs, years: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-             </div>
-
-             {/* CHART SECTION */}
-             <div className="bg-black border border-gray-800 p-4 rounded-lg h-72 mb-6">
-                <ResponsiveContainer width="100%" height="100%">
-                    {fireChartMode === 'WEALTH' ? (
-                        <AreaChart data={projectionData}>
-                            <defs>
-                                <linearGradient id="colorNominal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
-                                </linearGradient>
-                                <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <XAxis dataKey="year" stroke="#555" tick={{fontSize: 10}} label={{ value: 'Years', position: 'insideBottomRight', offset: -5 }}/>
-                            <YAxis stroke="#555" tick={{fontSize: 10}} tickFormatter={v => `${(v/100000).toFixed(0)}L`}/>
-                            <Tooltip contentStyle={{backgroundColor: '#000', borderColor: '#333', borderRadius: '8px'}} formatter={(v: number) => `৳ ${v.toLocaleString()}`}/>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#444"/>
-                            <ReferenceLine y={targetRealWealth} label="Target Real" stroke="red" strokeDasharray="3 3" />
-                            
-                            <Area type="monotone" dataKey="nominal" stroke="#F59E0B" fillOpacity={1} fill="url(#colorNominal)" name="Nominal Wealth (Bank Balance)" animationDuration={1500}/>
-                            <Area type="monotone" dataKey="real" stroke="#10B981" fillOpacity={1} fill="url(#colorReal)" name="Real Wealth (Purchasing Power)" animationDuration={1500}/>
-                            <Legend />
-                        </AreaChart>
-                    ) : (
-                        <BarChart data={projectionData}>
-                            <XAxis dataKey="year" stroke="#555" tick={{fontSize: 10}} />
-                            <YAxis stroke="#555" tick={{fontSize: 10}} tickFormatter={v => `৳${v}`} />
-                            <Tooltip contentStyle={{backgroundColor: '#000', borderColor: '#333', borderRadius: '8px'}} formatter={(v: number) => `৳ ${v.toLocaleString()}`}/>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#444"/>
-                            <Legend />
-                            <Bar dataKey="monthlyContribution" name="Monthly Investment" fill="#3B82F6" stackId="a" animationDuration={1500} />
-                            <Bar dataKey="monthlyInterest" name="Monthly Growth" fill="#10B981" stackId="a" animationDuration={1500} />
-                        </BarChart>
-                    )}
-                </ResponsiveContainer>
-             </div>
-        </div>
-    </div>
-  )};
-
-  const renderOffense = () => (
-    <div className="space-y-6 animate-in fade-in">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* BUSINESS FORM */}
-            <div className="glass-panel p-6 rounded-lg">
-                <div className="flex justify-between items-center mb-4">
-                     <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
-                        <Building2 className="text-blue-500"/> Business Builder
-                     </h3>
-                     {isEditingBiz && <button onClick={() => {setIsEditingBiz(false); setBizForm({name:'', revenue:'', valuation:'', stage:1})}} className="text-xs text-red-500">Cancel</button>}
-                </div>
-                
-                <div className="space-y-3">
-                    <input value={bizForm.name} onChange={e => setBizForm({...bizForm, name: e.target.value})} placeholder="Venture Name" className="w-full bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
-                    <div className="flex gap-2">
-                        <input type="number" value={bizForm.revenue} onChange={e => setBizForm({...bizForm, revenue: e.target.value})} placeholder="Monthly Rev" className="w-1/2 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
-                        <input type="number" value={bizForm.valuation} onChange={e => setBizForm({...bizForm, valuation: e.target.value})} placeholder="Valuation" className="w-1/2 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-gray-500 uppercase mb-1">Growth Stage</p>
-                        <div className="flex gap-1">
-                            {[1,2,3,4,5].map(s => (
-                                <button key={s} onClick={() => setBizForm({...bizForm, stage: s})} className={`flex-1 py-2 text-xs font-bold rounded border ${bizForm.stage === s ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-800 text-gray-500 hover:bg-gray-800'}`}>{s}</button>
-                            ))}
-                        </div>
-                    </div>
-                    <button onClick={handleSaveBusiness} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded text-xs uppercase tracking-widest mt-2 shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">
-                        {isEditingBiz ? "Update Venture" : "Launch Venture"}
-                    </button>
-                </div>
-            </div>
-
-            {/* VENTURE LIST */}
-            <div className="space-y-3">
-                {(data.businesses || []).map(biz => (
-                    <div key={biz.id} className="bg-black border border-gray-800 p-4 rounded-lg group relative hover:border-blue-500 transition-all hover:-translate-y-1">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h4 className="font-bold text-white text-lg">{biz.name}</h4>
-                                <p className="text-xs text-blue-500 uppercase font-bold">Stage {biz.stage}: {BUSINESS_STAGES[biz.stage-1]?.goal}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-xl font-mono text-white font-bold">৳ {biz.valuation.toLocaleString()}</p>
-                                <p className="text-[10px] text-gray-500 uppercase">Valuation</p>
-                            </div>
-                        </div>
-                        <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between items-center">
-                            <p className="text-xs text-gray-500">Monthly Rev: <span className="text-wealth-green font-mono">৳ {biz.monthlyRevenue.toLocaleString()}</span></p>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => startEditBusiness(biz)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14}/></button>
-                                <button onClick={() => handleDeleteBusiness(biz.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                {(data.businesses || []).length === 0 && (
-                    <div className="h-full flex items-center justify-center border border-dashed border-gray-800 rounded-lg text-gray-500 text-xs italic">
-                        No active ventures. Start building.
-                    </div>
-                )}
-            </div>
-        </div>
-    </div>
-  );
-
-  const renderAudit = () => {
-    const snapshots = [...(data.budgetSnapshots || [])].sort((a,b) => b.month.localeCompare(a.month));
-    const sortedSnapshots = [...(data.budgetSnapshots || [])].sort((a, b) => a.month.localeCompare(b.month));
-    const auditChartData = sortedSnapshots.map(s => ({
-        month: s.month,
-        income: s.income,
-        expense: s.essentialExpenses + s.nonEssentialExpenses,
-        savings: s.income - (s.essentialExpenses + s.nonEssentialExpenses)
-    }));
-
-    return (
-    <div className="space-y-6 animate-in fade-in">
-        {/* INPUT FORM */}
-        <div className="glass-panel p-6 rounded-lg">
-            <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
-                    <ClipboardList className="text-blue-500"/> Monthly Audit Record
-                 </h3>
-                 {isEditingSnapshot && <button onClick={() => {setIsEditingSnapshot(false); setSnapshotForm({month: new Date().toISOString().slice(0, 7), income: '', dependents: '0', essential: '', nonEssential: '', notes: ''})}} className="text-xs text-red-500">Cancel</button>}
-            </div>
-
-            <div className="space-y-4">
-                <div className="flex gap-4">
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Month</label>
-                        <input type="month" value={snapshotForm.month} onChange={e => setSnapshotForm({...snapshotForm, month: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Income</label>
-                        <input type="number" value={snapshotForm.income} onChange={e => setSnapshotForm({...snapshotForm, income: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Dependents</label>
-                        <input type="number" value={snapshotForm.dependents} onChange={e => setSnapshotForm({...snapshotForm, dependents: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                </div>
-                <div className="flex gap-4">
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Essential Exp</label>
-                        <input type="number" value={snapshotForm.essential} onChange={e => setSnapshotForm({...snapshotForm, essential: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Non-Essential Exp</label>
-                        <input type="number" value={snapshotForm.nonEssential} onChange={e => setSnapshotForm({...snapshotForm, nonEssential: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Notes</label>
-                        <input type="text" value={snapshotForm.notes} onChange={e => setSnapshotForm({...snapshotForm, notes: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                </div>
-                <button onClick={handleSaveSnapshot} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">
-                    {isEditingSnapshot ? "Update Snapshot" : "Log Month"}
-                </button>
-            </div>
-        </div>
-
-        {/* AUDIT TABLE */}
-        <div className="glass-panel rounded-lg overflow-hidden">
-             <div className="p-4 border-b border-gray-800">
-                <h3 className="text-sm font-bold text-white uppercase">Historical Performance</h3>
-             </div>
-             <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-gray-400">
-                    <thead className="bg-slate-900 text-gray-500 uppercase font-bold">
-                        <tr>
-                            <th className="p-3">Month</th>
-                            <th className="p-3 text-right">Income</th>
-                            <th className="p-3 text-center">People</th>
-                            <th className="p-3 text-right">PPI / Class</th>
-                            <th className="p-3 text-right">Expenses</th>
-                            <th className="p-3 text-right">Savings</th>
-                            <th className="p-3">Notes</th>
-                            <th className="p-3 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                        {snapshots.map((s, index) => {
-                            const totalPeople = (s.dependents || 0) + 1;
-                            const ppi = s.income / totalPeople;
-                            const totalExp = (s.essentialExpenses || 0) + (s.nonEssentialExpenses || 0);
-                            const savings = s.income - totalExp;
-                            const financialClass = getFinancialClass(ppi);
-                            const prev = snapshots[index + 1];
-                            const incomeTrend = prev ? (s.income >= prev.income ? 'UP' : 'DOWN') : 'FLAT';
-                            const expenseTrend = prev ? ((totalExp <= (prev.essentialExpenses + prev.nonEssentialExpenses)) ? 'BETTER' : 'WORSE') : 'FLAT';
-                            const savingsTrend = prev ? (savings >= (prev.income - (prev.essentialExpenses + prev.nonEssentialExpenses)) ? 'UP' : 'DOWN') : 'FLAT';
-
-                            return (
-                            <tr key={s.id} className="hover:bg-slate-900/50 group transition-colors">
-                                <td className="p-3 font-mono text-white">{s.month}</td>
-                                <td className="p-3 text-right font-mono text-white">
-                                    <div className="flex items-center justify-end gap-1">
-                                        {incomeTrend === 'UP' && <TrendingUp size={12} className="text-green-500"/>}
-                                        {incomeTrend === 'DOWN' && <TrendingDown size={12} className="text-red-500"/>}
-                                        {s.income.toLocaleString()}
-                                    </div>
-                                </td>
-                                <td className="p-3 text-center">{totalPeople}</td>
-                                <td className="p-3 text-right">
-                                    <div className="flex flex-col items-end">
-                                        <span className="font-mono text-white">৳ {Math.round(ppi).toLocaleString()}</span>
-                                        <span className={`text-[9px] uppercase font-bold ${financialClass.color}`}>{financialClass.label}</span>
-                                    </div>
-                                </td>
-                                <td className="p-3 text-right font-mono">
-                                    <div className="flex items-center justify-end gap-1">
-                                        {expenseTrend === 'BETTER' && <TrendingDown size={12} className="text-green-500"/>}
-                                        {expenseTrend === 'WORSE' && <TrendingUp size={12} className="text-red-500"/>}
-                                        {totalExp.toLocaleString()}
-                                    </div>
-                                    <span className="text-[9px] text-gray-500 block">{s.essentialExpenses} Ess • {s.nonEssentialExpenses} Non</span>
-                                </td>
-                                <td className={`p-3 text-right font-mono font-bold ${savings > 0 ? 'text-wealth-green' : 'text-red-500'}`}>
-                                    <div className="flex items-center justify-end gap-1">
-                                         {savingsTrend === 'UP' && <TrendingUp size={12} className="text-green-500"/>}
-                                         {savingsTrend === 'DOWN' && <TrendingDown size={12} className="text-red-500"/>}
-                                         {savings.toLocaleString()}
-                                    </div>
-                                </td>
-                                <td className="p-3 truncate max-w-[150px]">{s.notes}</td>
-                                <td className="p-3 text-right">
-                                    <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEditSnapshot(s)} className="text-blue-500 hover:text-blue-400"><Edit3 size={14}/></button>
-                                        <button onClick={() => handleDeleteSnapshot(s.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        )})}
-                        {snapshots.length === 0 && <tr className="text-center"><td colSpan={8} className="p-6 italic">No monthly audits found.</td></tr>}
-                    </tbody>
-                </table>
-             </div>
-        </div>
-    </div>
-  )};
-
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20 relative">
       
@@ -1343,12 +1573,13 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
         </div>
         <div className="flex flex-wrap gap-2">
             {[
-                {id: 'COMMAND', icon: LayoutDashboard, label: 'Command Center'},
+                {id: 'COMMAND', icon: LayoutDashboard, label: 'Command'},
+                {id: 'ROADMAP', icon: Map, label: 'Roadmap (NEW)'}, 
                 {id: 'JOURNAL', icon: Brain, label: 'Journal'}, 
                 {id: 'BLUEPRINT', icon: BookOpen, label: 'Blueprint'},
                 {id: 'FIRE', icon: Rocket, label: 'Projection'},
                 {id: 'OFFENSE', icon: Building2, label: 'Business'},
-                {id: 'PORTFOLIO', icon: Crown, label: 'Assets & Liabilities'},
+                {id: 'PORTFOLIO', icon: Crown, label: 'Assets'},
                 {id: 'AUDIT', icon: FileText, label: 'Audit'},
             ].map((tab) => (
                 <button
@@ -1367,6 +1598,7 @@ export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
       </header>
 
       {activeTab === 'COMMAND' && renderCommandCenter()}
+      {activeTab === 'ROADMAP' && renderRoadmap()}
       {activeTab === 'BLUEPRINT' && renderBlueprint()}
       {activeTab === 'OFFENSE' && renderOffense()}
       {activeTab === 'PORTFOLIO' && renderPortfolio()}

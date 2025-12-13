@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Clock, ChevronRight, Target, Shield, Zap, Layout, List, CheckCircle, AlertTriangle, Lightbulb, Users, BarChart3, Heart, Activity, Plus, Trash2, Save, Minus, Edit3, X, GraduationCap, Briefcase, Globe, Cpu, Play, Pause, RotateCcw, Coffee, Timer, Brain } from 'lucide-react';
+import { BookOpen, Clock, ChevronRight, Target, Shield, Zap, Layout, List, CheckCircle, AlertTriangle, Lightbulb, Users, BarChart3, Heart, Activity, Plus, Trash2, Save, Minus, Edit3, X, GraduationCap, Briefcase, Globe, Cpu, Play, Pause, RotateCcw, Coffee, Timer, Brain, Calendar, PenTool, TrendingUp, AlertCircle } from 'lucide-react';
 import { STUDY_PHASES, GENIUS_LEARNING_RULES, CAREER_JOB_TIERS, REMOTE_JOB_STEPS } from '../constants';
 
 // --- STATIC DATA (CONSTANTS) ---
@@ -38,8 +39,28 @@ const BEZOS_STEPS = [
   "Define Outcome", "Break into Inputs", "Automate Triggers", "Track Feedback", "Refine Slowly"
 ];
 
+// --- TYPES FOR JOURNAL ---
+interface Exam {
+    id: string;
+    name: string;
+    date: string; // YYYY-MM-DD
+    startDate: string; // YYYY-MM-DD (Start of Prep)
+}
+
+interface StudyLog {
+    id: string;
+    date: string;
+    timestamp: string;
+    subject: string;
+    topic: string;
+    duration: number; // minutes
+    focus: number; // 1-10
+    summary: string; // Feynman
+    distraction: string; // What broke focus?
+}
+
 export const TheAcademy: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STRATEGY' | 'SYSTEMS' | 'ACADEMICS' | 'CAREER' | 'WISDOM'>('ACADEMICS');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STRATEGY' | 'SYSTEMS' | 'ACADEMICS' | 'JOURNAL' | 'CAREER' | 'WISDOM'>('ACADEMICS');
   
   // --- STATE MANAGEMENT WITH PERSISTENCE ---
 
@@ -107,6 +128,21 @@ export const TheAcademy: React.FC = () => {
   const [pomoMode, setPomoMode] = useState<'FOCUS' | 'SHORT' | 'LONG'>('FOCUS');
   const [pomoStreak, setPomoStreak] = useState(0);
 
+  // 7. EXAMS & STUDY JOURNAL (NEW)
+  const [exams, setExams] = useState<Exam[]>(() => {
+      const saved = localStorage.getItem('academy_exams');
+      return saved ? JSON.parse(saved) : [
+          { id: '1', name: 'GRE Exam', date: '2025-10-14', startDate: new Date().toISOString().split('T')[0] }
+      ];
+  });
+  const [newExam, setNewExam] = useState({ name: '', date: '', startDate: '' });
+
+  const [studyLogs, setStudyLogs] = useState<StudyLog[]>(() => {
+      const saved = localStorage.getItem('academy_logs');
+      return saved ? JSON.parse(saved) : [];
+  });
+  const [newLog, setNewLog] = useState({ subject: '', topic: '', duration: '', focus: '8', summary: '', distraction: '' });
+
   // PERSISTENCE EFFECTS
   useEffect(() => { localStorage.setItem('academy_capitals', JSON.stringify(capitals)); }, [capitals]);
   useEffect(() => { localStorage.setItem('academy_gaps', JSON.stringify(gaps)); }, [gaps]);
@@ -118,6 +154,8 @@ export const TheAcademy: React.FC = () => {
       if (sprintEndTime) localStorage.setItem('academy_sprint_end', sprintEndTime.toString());
       else localStorage.removeItem('academy_sprint_end');
   }, [sprintEndTime]);
+  useEffect(() => { localStorage.setItem('academy_exams', JSON.stringify(exams)); }, [exams]);
+  useEffect(() => { localStorage.setItem('academy_logs', JSON.stringify(studyLogs)); }, [studyLogs]);
 
   // POMODORO TIMER EFFECT
   useEffect(() => {
@@ -229,6 +267,38 @@ export const TheAcademy: React.FC = () => {
       if (confirm("Reset current sprint?")) {
           setSprintEndTime(null);
       }
+  };
+
+  // JOURNAL HANDLERS
+  const handleAddExam = () => {
+      if (!newExam.name || !newExam.date) return;
+      setExams([...exams, { id: Date.now().toString(), name: newExam.name, date: newExam.date, startDate: newExam.startDate || new Date().toISOString().split('T')[0] }]);
+      setNewExam({ name: '', date: '', startDate: '' });
+  };
+
+  const handleDeleteExam = (id: string) => {
+      setExams(exams.filter(e => e.id !== id));
+  };
+
+  const handleAddLog = () => {
+      if (!newLog.subject || !newLog.topic) return;
+      const log: StudyLog = {
+          id: Date.now().toString(),
+          date: new Date().toISOString().split('T')[0],
+          timestamp: new Date().toLocaleTimeString(),
+          subject: newLog.subject,
+          topic: newLog.topic,
+          duration: parseInt(newLog.duration) || 0,
+          focus: parseInt(newLog.focus),
+          summary: newLog.summary,
+          distraction: newLog.distraction
+      };
+      setStudyLogs([log, ...studyLogs]);
+      setNewLog({ subject: '', topic: '', duration: '', focus: '8', summary: '', distraction: '' });
+  };
+
+  const handleDeleteLog = (id: string) => {
+      setStudyLogs(studyLogs.filter(l => l.id !== id));
   };
 
   // --- RENDER SECTIONS ---
@@ -715,6 +785,192 @@ export const TheAcademy: React.FC = () => {
     </div>
   );
 
+  const renderJournal = () => (
+      <div className="space-y-6 animate-in fade-in">
+          {/* EXAM COUNTDOWN MATRIX */}
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-green-500/10 to-transparent rounded-bl-full pointer-events-none"></div>
+              <div className="flex justify-between items-center mb-6 relative z-10">
+                  <div className="flex items-center gap-2">
+                      <Calendar className="text-green-500" />
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Exam Countdown Matrix</h3>
+                  </div>
+                  <div className="flex gap-2">
+                      <input 
+                          value={newExam.name} 
+                          onChange={(e) => setNewExam({...newExam, name: e.target.value})} 
+                          placeholder="Exam Name..." 
+                          className="bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 text-xs p-2 rounded text-gray-900 dark:text-white outline-none w-32"
+                      />
+                      <input 
+                          type="date"
+                          value={newExam.date} 
+                          onChange={(e) => setNewExam({...newExam, date: e.target.value})} 
+                          className="bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 text-xs p-2 rounded text-gray-900 dark:text-white outline-none"
+                      />
+                      <button onClick={handleAddExam} className="bg-green-600 hover:bg-green-500 text-white p-2 rounded"><Plus size={14}/></button>
+                  </div>
+              </div>
+
+              <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
+                  <table className="w-full text-left text-sm">
+                      <thead className="bg-green-600 text-white uppercase font-bold text-xs">
+                          <tr>
+                              <th className="p-3">Exam Name</th>
+                              <th className="p-3">Target Date</th>
+                              <th className="p-3 text-center">Days Gone</th>
+                              <th className="p-3 text-center">Days Left</th>
+                              <th className="p-3 text-center">Status</th>
+                              <th className="p-3 text-right">Action</th>
+                          </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-gray-800">
+                          {exams.map(exam => {
+                              const today = new Date();
+                              const target = new Date(exam.date);
+                              const start = new Date(exam.startDate);
+                              const diffTime = target.getTime() - today.getTime();
+                              const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                              
+                              const goneTime = today.getTime() - start.getTime();
+                              const daysGone = Math.max(0, Math.floor(goneTime / (1000 * 60 * 60 * 24)));
+
+                              return (
+                                  <tr key={exam.id} className="hover:bg-gray-50 dark:hover:bg-black/20">
+                                      <td className="p-3 font-bold text-gray-900 dark:text-white">{exam.name}</td>
+                                      <td className="p-3 font-mono text-gray-600 dark:text-gray-400">{exam.date}</td>
+                                      <td className="p-3 text-center font-mono text-blue-500 font-bold">{daysGone}</td>
+                                      <td className="p-3 text-center font-mono font-bold text-xl text-spartan-red">{daysLeft > 0 ? daysLeft : 0}</td>
+                                      <td className="p-3 text-center">
+                                          <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${daysLeft > 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500'}`}>
+                                              {daysLeft > 0 ? 'Valid' : 'Expired'}
+                                          </span>
+                                      </td>
+                                      <td className="p-3 text-right">
+                                          <button onClick={() => handleDeleteExam(exam.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                      </td>
+                                  </tr>
+                              );
+                          })}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+
+          {/* ADVANCED PRODUCTIVITY JOURNAL */}
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                  <PenTool className="text-purple-500" />
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Productive Advanced Journal</h3>
+              </div>
+
+              {/* INPUT AREA */}
+              <div className="bg-gray-50 dark:bg-black p-4 rounded border border-gray-200 dark:border-gray-800 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <div className="md:col-span-1">
+                          <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Subject</label>
+                          <input 
+                              placeholder="e.g. GRE Quant" 
+                              value={newLog.subject} 
+                              onChange={(e) => setNewLog({...newLog, subject: e.target.value})}
+                              className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                          />
+                      </div>
+                      <div className="md:col-span-2">
+                          <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Topic / Goal</label>
+                          <input 
+                              placeholder="e.g. Geometry Triangles 20 Qs" 
+                              value={newLog.topic} 
+                              onChange={(e) => setNewLog({...newLog, topic: e.target.value})}
+                              className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                          />
+                      </div>
+                      <div className="md:col-span-1 flex gap-2">
+                          <div className="flex-1">
+                              <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Duration (Min)</label>
+                              <input 
+                                  type="number"
+                                  value={newLog.duration} 
+                                  onChange={(e) => setNewLog({...newLog, duration: e.target.value})}
+                                  className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                              />
+                          </div>
+                          <div className="flex-1">
+                              <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Focus (1-10)</label>
+                              <select 
+                                  value={newLog.focus}
+                                  onChange={(e) => setNewLog({...newLog, focus: e.target.value})}
+                                  className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                              >
+                                  {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                          <label className="text-[10px] text-green-500 uppercase font-bold block mb-1">Feynman Summary (What I learned)</label>
+                          <textarea 
+                              placeholder="Explain simply..." 
+                              value={newLog.summary} 
+                              onChange={(e) => setNewLog({...newLog, summary: e.target.value})}
+                              className="w-full h-20 bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-green-500 resize-none"
+                          />
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-red-500 uppercase font-bold block mb-1">Distractions / Struggles</label>
+                          <textarea 
+                              placeholder="e.g. Phone notif, difficult concept..." 
+                              value={newLog.distraction} 
+                              onChange={(e) => setNewLog({...newLog, distraction: e.target.value})}
+                              className="w-full h-20 bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-red-500 resize-none"
+                          />
+                      </div>
+                  </div>
+                  <button onClick={handleAddLog} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded text-xs uppercase tracking-widest transition-all">
+                      Log Session
+                  </button>
+              </div>
+
+              {/* LOGS DISPLAY */}
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                  {studyLogs.length === 0 && <p className="text-center text-gray-500 italic text-sm">No study sessions logged. Get to work.</p>}
+                  {studyLogs.map((log) => (
+                      <div key={log.id} className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 p-4 rounded-lg hover:border-purple-500/50 transition-colors group">
+                          <div className="flex justify-between items-start mb-2">
+                              <div>
+                                  <span className="text-[10px] text-gray-500 font-mono">{log.date} • {log.timestamp}</span>
+                                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">{log.subject}: <span className="font-medium text-gray-600 dark:text-gray-400">{log.topic}</span></h4>
+                              </div>
+                              <button onClick={() => handleDeleteLog(log.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12}/></button>
+                          </div>
+                          
+                          <div className="flex gap-4 text-xs mb-3">
+                              <span className="bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1"><Clock size={10}/> {log.duration}m</span>
+                              <span className={`px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 ${log.focus >= 8 ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-500' : 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-500'}`}>
+                                  <Activity size={10}/> Focus: {log.focus}/10
+                              </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                              <div className="bg-green-50 dark:bg-green-900/10 p-2 rounded border border-green-100 dark:border-green-900/30">
+                                  <p className="text-[9px] text-green-600 dark:text-green-500 font-bold uppercase mb-1">Learnings</p>
+                                  <p className="text-gray-700 dark:text-gray-300 leading-snug">{log.summary}</p>
+                              </div>
+                              {log.distraction && (
+                                  <div className="bg-red-50 dark:bg-red-900/10 p-2 rounded border border-red-100 dark:border-red-900/30">
+                                      <p className="text-[9px] text-red-600 dark:text-red-500 font-bold uppercase mb-1">Struggles</p>
+                                      <p className="text-gray-700 dark:text-gray-300 leading-snug">{log.distraction}</p>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      </div>
+  );
+
   const renderCareer = () => (
       <div className="space-y-6 animate-in fade-in">
           {/* HIGH INCOME JOB TIERS */}
@@ -821,7 +1077,8 @@ export const TheAcademy: React.FC = () => {
               { id: 'STRATEGY', icon: Target }, 
               { id: 'SYSTEMS', icon: Zap }, 
               { id: 'ACADEMICS', icon: BookOpen }, 
-              { id: 'CAREER', icon: Briefcase }, // New Tab
+              { id: 'JOURNAL', icon: PenTool }, // New Tab
+              { id: 'CAREER', icon: Briefcase },
               { id: 'WISDOM', icon: Lightbulb }
           ].map((tab) => (
               <button
@@ -844,6 +1101,7 @@ export const TheAcademy: React.FC = () => {
           {activeTab === 'STRATEGY' && renderStrategy()}
           {activeTab === 'SYSTEMS' && renderSystems()}
           {activeTab === 'ACADEMICS' && renderAcademics()}
+          {activeTab === 'JOURNAL' && renderJournal()}
           {activeTab === 'CAREER' && renderCareer()}
           {activeTab === 'WISDOM' && renderWisdom()}
        </div>

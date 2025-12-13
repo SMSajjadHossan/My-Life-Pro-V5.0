@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -7,15 +8,12 @@ import { TheAcademy } from './components/TheAcademy';
 import { KnowledgeVault } from './components/KnowledgeVault';
 import { SocialDynamics } from './components/SocialDynamics';
 import { WarRoom } from './components/WarRoom';
-import { AppSection, FinancialState, Habit, Book, UserProfile, Transaction } from './types';
-import { INITIAL_USER_PROFILE, INITIAL_HABITS, INITIAL_LIBRARY } from './constants';
+import { AppSection, FinancialState, Habit, Book, UserProfile, Transaction, JournalTask, DailyAction, ChecklistState } from './types';
+import { INITIAL_USER_PROFILE, INITIAL_HABITS, INITIAL_LIBRARY, INITIAL_STRATEGIC_OBJECTIVES } from './constants';
 import { Command, Search, Zap, DollarSign, CheckSquare, ArrowRight, X, Terminal, Cpu } from 'lucide-react';
-import { db } from './services/firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
   const [currentSection, setCurrentSection] = useState<AppSection>(AppSection.WEALTH);
-  const [isFirebaseLive, setIsFirebaseLive] = useState(false);
   
   // -- USER PROFILE WITH XP --
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -90,81 +88,169 @@ const App: React.FC = () => {
     }
   });
   
-  const [objectives, setObjectives] = useState<any[]>(() => {
+  // -- NEW: LIFTED DASHBOARD STATE --
+  const [objectives, setObjectives] = useState<JournalTask[]>(() => {
       try {
           const saved = localStorage.getItem('dash_objectives');
+          return saved ? JSON.parse(saved) : INITIAL_STRATEGIC_OBJECTIVES;
+      } catch {
+          return INITIAL_STRATEGIC_OBJECTIVES;
+      }
+  });
+
+  const [checklists, setChecklists] = useState<ChecklistState>(() => {
+      try {
+          const saved = localStorage.getItem('dash_checklists');
+          return saved ? JSON.parse(saved) : { morning: {}, daytime: {}, mindset: {}, finance: {} };
+      } catch {
+          return { morning: {}, daytime: {}, mindset: {}, finance: {} };
+      }
+  });
+
+  const [dailyActions, setDailyActions] = useState<DailyAction[]>(() => {
+      try {
+          const saved = localStorage.getItem('dash_daily_actions');
           return saved ? JSON.parse(saved) : [];
       } catch {
           return [];
       }
   });
 
-  // --- 🔥 REAL-TIME FIREBASE SYNC (THE "PULL" LOGIC) ---
-  // Subscribes to Cloud DB and updates local state instantly when Android updates.
+  // --- 🔥 AUTO-SAVE (SYNC TO LOCALSTORAGE) ---
   useEffect(() => {
-    if (!db) return;
-
-    // Listen to the 'commander_data' document in the 'users' collection
-    const userDocRef = doc(db, 'users', 'commander_data');
-
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            // Only update if remote data exists.
-            // This enables "Live Sync" - changes on Phone appear here instantly.
-            console.log("🔥 Cloud Data Received");
-            
-            // We only update if the timestamps differ or simple overwrite
-            if (data.financialData) setFinancialData(data.financialData);
-            if (data.habits) setHabits(data.habits);
-            if (data.books) setBooks(data.books);
-            if (data.userProfile) setUserProfile(data.userProfile);
-            if (data.objectives) setObjectives(data.objectives);
-            
-            setIsFirebaseLive(true);
-        }
-    }, (error) => {
-        console.error("Firebase Sync Error:", error);
-        setIsFirebaseLive(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // --- 🔥 AUTO-SAVE LOGIC (THE "PUSH" LOGIC) ---
-  // Debounce updates: Wait 2 seconds after typing stops, then push to Cloud.
-  useEffect(() => {
-      // 1. Save to Local Storage (Instant)
       localStorage.setItem('financialData', JSON.stringify(financialData));
       localStorage.setItem('habits', JSON.stringify(habits));
       localStorage.setItem('books', JSON.stringify(books));
       localStorage.setItem('user_profile', JSON.stringify(userProfile));
       localStorage.setItem('dash_objectives', JSON.stringify(objectives));
+      localStorage.setItem('dash_checklists', JSON.stringify(checklists));
+      localStorage.setItem('dash_daily_actions', JSON.stringify(dailyActions));
+  }, [financialData, habits, books, userProfile, objectives, checklists, dailyActions]);
 
-      // 2. Push to Firebase (Debounced)
-      if (!db) return;
+  // --- COMPREHENSIVE DATA CORE EXPORT/IMPORT ---
+  // We explicitly list every key used by every component to ensure a full backup.
+  const ALL_SYSTEM_KEYS = [
+      // Main State
+      'financialData', 'habits', 'books', 'user_profile', 
+      'dash_objectives', 'dash_checklists', 'dash_daily_actions', 'dash_tomorrow',
+      // War Room
+      'war_room_chat', 'pending_audit', 'pending_ai_trigger',
+      // Wealth Fortress
+      'wealth_journal_data_v2', 'wealth_fire_inputs_v2',
+      // Spartan Vessel
+      'spartan_daily_tracker_v6', 'spartan_custom_checklist', 'spartan_daily_code_v2', 'spartan_custom_knowledge',
+      // The Academy
+      'academy_capitals', 'academy_gaps', 'academy_bezos', 'academy_evening_checks', 'academy_failures', 'academy_sprint_obj', 'academy_sprint_end', 'academy_exams', 'academy_logs'
+  ];
 
-      const timer = setTimeout(async () => {
-          try {
-              const userDocRef = doc(db, 'users', 'commander_data');
-              await setDoc(userDocRef, {
-                  financialData,
-                  habits,
-                  books,
-                  userProfile,
-                  objectives,
-                  lastUpdated: new Date().toISOString(),
-                  device: navigator.userAgent
-              }, { merge: true });
-              console.log("☁️ Auto-Saved to Cloud");
-          } catch (e) {
-              console.error("Cloud Save Failed", e);
+  const handleExport = () => {
+      const exportBundle: Record<string, any> = {
+          meta: {
+              version: "Titanium-5.3",
+              timestamp: new Date().toISOString(),
+              agent: navigator.userAgent
+          },
+          data: {}
+      };
+
+      // Read directly from LocalStorage to capture sub-component state not held in App.tsx
+      ALL_SYSTEM_KEYS.forEach(key => {
+          const raw = localStorage.getItem(key);
+          if (raw !== null) {
+              try {
+                  exportBundle.data[key] = JSON.parse(raw);
+              } catch (e) {
+                  exportBundle.data[key] = raw; // Handle raw strings if any
+              }
           }
-      }, 2000); // 2 second delay
+      });
 
-      return () => clearTimeout(timer);
-  }, [financialData, habits, books, userProfile, objectives]);
+      const blob = new Blob([JSON.stringify(exportBundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `MYLIFE_CORE_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("Soul File Extracted Successfully", "success");
+  };
 
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const input = e.target;
+      const file = input.files?.[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          try {
+              const content = event.target?.result as string;
+              if (!content) {
+                  alert("Error: Empty file uploaded.");
+                  return;
+              }
+
+              let bundle;
+              try {
+                  bundle = JSON.parse(content);
+              } catch (jsonErr) {
+                  alert("Error: File is not valid JSON.");
+                  return;
+              }
+              
+              // SUPPORT BOTH NEW (bundle.data) AND LEGACY (flat) FORMATS
+              let dataToRestore: any = null;
+              let version = bundle.meta?.version || "Legacy Format";
+              
+              if (bundle.data) {
+                  dataToRestore = bundle.data;
+              } else if (bundle.financialData || bundle.habits) {
+                  // It's a legacy flat file
+                  dataToRestore = bundle;
+              }
+
+              if (!dataToRestore || Object.keys(dataToRestore).length === 0) {
+                  alert("Error: No valid system data found in file.");
+                  return;
+              }
+
+              const keyCount = Object.keys(dataToRestore).length;
+
+              if(confirm(`⚠ SYSTEM RESTORE DETECTED ⚠\n\nVersion: ${version}\nData Points: ${keyCount}\n\nThis will DELETE current data and load the backup. Proceed?`)) {
+                  
+                  // 1. Wipe current system
+                  localStorage.clear();
+                  
+                  // 2. Write new data
+                  // CRITICAL: We do NOT call setFinancialData or other state setters here.
+                  // Calling them would trigger the 'useEffect' auto-save, which would capture
+                  // the *current* (old) state of other variables (like habits/books) and overwrite
+                  // what we just restored to localStorage.
+                  // Instead, we write to localStorage and force a reload.
+                  
+                  Object.entries(dataToRestore).forEach(([key, value]) => {
+                      if (typeof value === 'object') {
+                          localStorage.setItem(key, JSON.stringify(value));
+                      } else {
+                          localStorage.setItem(key, String(value));
+                      }
+                  });
+
+                  alert("System Restored Successfully. Rebooting interface...");
+                  
+                  // 3. Hard Reload to re-initialize all components from the fresh localStorage
+                  window.location.reload();
+              }
+          } catch (err) {
+              console.error(err);
+              alert("Critical Error during restore. Check console for details.");
+          } finally {
+              // Ensure input is reset so the same file can be selected again if needed
+              input.value = '';
+          }
+      };
+      reader.readAsText(file);
+  };
 
   // --- LOGIC HELPERS ---
   const calculateStreak = (history: string[]): number => {
@@ -332,14 +418,35 @@ const App: React.FC = () => {
 
   const renderSection = () => {
     switch(currentSection) {
-      case AppSection.DASHBOARD: return <Dashboard profile={userProfile} habits={habits} financialData={financialData} />;
+      case AppSection.DASHBOARD: 
+        return <Dashboard 
+                  profile={userProfile} 
+                  habits={habits} 
+                  financialData={financialData}
+                  objectives={objectives}
+                  setObjectives={setObjectives}
+                  checklists={checklists}
+                  setChecklists={setChecklists}
+                  dailyActions={dailyActions}
+                  setDailyActions={setDailyActions}
+               />;
       case AppSection.WAR_ROOM: return <WarRoom financialData={financialData} habits={habits} profile={userProfile} objectives={objectives} books={books} />;
       case AppSection.WEALTH: return <WealthFortress data={financialData} updateData={setFinancialData} />;
       case AppSection.KNOWLEDGE: return <KnowledgeVault books={books} setBooks={setBooks} />;
       case AppSection.SPARTAN: return <SpartanVessel habits={habits} toggleHabit={toggleHabit} adjustHabit={adjustHabit} updateHabit={updateHabit} />;
       case AppSection.ACADEMY: return <TheAcademy />;
       case AppSection.SOCIAL: return <SocialDynamics />;
-      default: return <Dashboard profile={userProfile} habits={habits} financialData={financialData} />;
+      default: return <Dashboard 
+                  profile={userProfile} 
+                  habits={habits} 
+                  financialData={financialData}
+                  objectives={objectives}
+                  setObjectives={setObjectives}
+                  checklists={checklists}
+                  setChecklists={setChecklists}
+                  dailyActions={dailyActions}
+                  setDailyActions={setDailyActions}
+               />;
     }
   };
 
@@ -410,7 +517,8 @@ const App: React.FC = () => {
         <Layout 
             currentSection={currentSection} 
             setSection={setCurrentSection}
-            isFirebaseLive={isFirebaseLive} // PASS TO LAYOUT
+            onExport={handleExport}
+            onImport={handleImport}
         >
           {renderSection()}
         </Layout>

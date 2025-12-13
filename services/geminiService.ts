@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 // Lazy initialization to prevent crashes if API_KEY is missing during build/render
@@ -133,7 +134,7 @@ export const getStoicAdvice = async (context: string) => {
 };
 
 // --- SUPER EXPERT NEURAL SCANNER (DEEP DISTILLATION) ---
-export const processNeuralInput = async (textInput: string, mediaBase64: string | null, mimeType: string = 'image/png') => {
+export const processNeuralInput = async (textInput: string, mediaBase64: string | null, mimeType: string = 'image/png', context: string = '') => {
   // OFFLINE HANDLING
   if (!navigator.onLine) {
       const snippet = textInput ? `"${textInput.substring(0, 40)}..."` : "Input Data";
@@ -155,46 +156,47 @@ export const processNeuralInput = async (textInput: string, mediaBase64: string 
   const ai = getAI();
   if (!ai) return JSON.stringify({ notes: [{ concept: "API Offline", action: "Check connection", iconCategory: "MIND" }] });
 
-  // REINFORCED PROMPT FOR "SUPER EXPERT" ACCURACY & EXCEL FORMAT
+  // REINFORCED PROMPT FOR "SUPER EXPERT" ACCURACY & TRANSCRIPT HUNTING
   const prompt = `
-  **ROLE:** Elite Neural Scanner & Content Linguist (Super Expert Level).
-  **MODE:** "JEMON ASHE TEMON" (As It Is) - Strict Adherence to Source Truth.
+  **PROTOCOL:** FORENSIC DEEP SCAN (ULTRA ACCURACY MODE).
+  **ROLE:** Elite Content Analyst & Linguist.
+  **INPUT DATA:** "${textInput || 'Attached File'}"
+  **CONTEXT:** "${context || 'General Analysis'}"
 
-  **INPUT:** YouTube Link (or Text).
-  **OBJECTIVE:** Extract the EXACT Script or Lyrics, analyze deeply, and output in a structured EXCEL-LIKE format (English + Bangla).
+  **EXECUTION STEPS (STRICT ORDER):**
+  
+  1.  **IDENTIFY & SEARCH (THE MOST IMPORTANT STEP):**
+      - If the input is a **URL (YouTube, Spotify, Article)**: You MUST use Google Search to find the **FULL TRANSCRIPT**, **LYRICS**, or **SCRIPT** first.
+      - **DO NOT** summarize based on the title alone.
+      - **DO NOT** hallucinate. If you cannot find the exact text, search for "Summary of [Title]" or "Analysis of [URL]" to get the most detailed breakdown possible.
+      - *Verification:* In your internal thought process, quote the first and last lines of the content to ensure you have the full picture.
 
-  **EXECUTION PROTOCOL (SUPER EXPERT):**
-  1. **DETECT:** Is this a Song (Music Video) or a Talk/Tutorial?
-  2. **RETRIEVE:** Use Google Search to find the *verbatim* lyrics or transcript.
-     - Query: "lyrics of [Video Title]", "full transcript of [Video Title]".
-  3. **ANALYZE (NO FILTER):** 
-     - **SOURCE NEUTRALITY:** No matter what the source language is, understand the *original meaning* perfectly.
-     - **EXECUTIVE BRIEF:** Write a comprehensive Executive Summary of the content.
-     - **KEY POINTS:** Break down the content into rows for an Excel sheet.
-  4. **TRANSLATE (BILINGUAL):** 
-     - Every single field must be in **English** then **Bangla** (separated by newline).
-     - The Bangla translation must capture the *soul* and *vibe* of the source ("Jemon ashe temon").
+  2.  **DEEP ANALYSIS (COVER EVERYTHING):**
+      - Do not miss anything.
+      - If it is a video, cover the *entire* duration (Start, Middle, End).
+      - If it is a song, analyze the *hidden meaning* behind the lyrics.
+      - Extract every specific rule, habit, or strategy mentioned.
 
-  **JSON OUTPUT STRUCTURE (STRICT - FOR EXCEL EXPORT):**
+  3.  **TRANSLATE & FORMAT (BILINGUAL):**
+      - Output strictly in English followed by Bangla (Jemon Ashe Temon - Soulful Translation).
+      - The Bangla should sound native, powerful, and commanding.
+
+  **JSON OUTPUT STRUCTURE (STRICT):**
+  You must output ONLY valid JSON.
   {
-    "title": "Exact Video Title (English)\\n(ভিডিওর শিরোনাম - বাংলা)",
-    "summary": "EXECUTIVE BRIEF: High-level summary of the entire content. (English)\\n(সারসংক্ষেপ: সম্পূর্ণ বিষয়বস্তুর উচ্চ-স্তরের সারাংশ - বাংলা)",
+    "title": "Exact Title of Content (English)\\n(বাংলা শিরোনাম)",
+    "summary": "DETAILED EXECUTIVE BRIEF: A comprehensive summary covering the WHOLE content from start to finish. Don't be brief, be thorough. (English)\\n(বিস্তারিত সারসংক্ষেপ: শুরু থেকে শেষ পর্যন্ত সম্পূর্ণ বিষয়বস্তু - বাংলা)",
     "notes": [
       {
-        "concept": "[Key Point] English...\\n[মূল পয়েন্ট] বাংলা...",
-        "problem": "[Real-Life Problem Analysis] English...\\n[বাস্তব জীবনের সমস্যা বিশ্লেষণ] বাংলা...",
-        "action": "[Simple Short Action] English...\\n[সহজ ছোট পদক্ষেপ] বাংলা...",
-        "example": "[Real Example / Exact Quote] English...\\n[উদাহরণ / সরাসরি উদ্ধৃতি] বাংলা...",
+        "concept": "[The Rule/Core Idea] English...\\n[মূল নিয়ম] বাংলা...",
+        "problem": "[The Pain/Context] Why does this matter? What problem does it solve? English...\\n[সমস্যা/প্রেক্ষাপট] বাংলা...",
+        "action": "[The Protocol] Specific, Physical Action Step. English...\\n[করণীয় কাজ] বাংলা...",
+        "example": "[Evidence] A direct quote, timestamp reference, or case study from the content. English...\\n[প্রমাণ/উদ্ধৃতি] বাংলা...",
         "iconCategory": "MIND" // Options: MONEY, POWER, HEALTH, SKILL, MIND
-      }
+      },
+      ... (Create as many notes as needed to cover the WHOLE content. Do not limit to 3.)
     ]
   }
-  
-  **QUALITY CONTROL:**
-  1. **Excel Ready:** Ensure 'concept', 'problem', 'action', and 'example' are distinct and detailed.
-  2. **Jemon Ashe Temon:** If the source is aggressive, be aggressive. If poetic, be poetic.
-  3. **Bilingual:** Double-check that EVERY string has an English part and a Bangla part.
-  4. **Accuracy:** Use the Google Search tool to verify the lyrics/script.
   `;
 
   const parts: any[] = [{ text: prompt }];
@@ -218,9 +220,9 @@ export const processNeuralInput = async (textInput: string, mediaBase64: string 
       model: 'gemini-2.5-flash',
       contents: { parts },
       config: {
-        // responseMimeType: 'application/json', // REMOVED to allow googleSearch tool usage
-        temperature: 0.1, // Ultra-low temperature for factual accuracy
-        tools: [{ googleSearch: {} }] // ENABLED SEARCH FOR ACCURACY
+        temperature: 0.2, // Low temp for factual accuracy
+        maxOutputTokens: 8192, // Max tokens for long summaries
+        tools: [{ googleSearch: {} }] // CRITICAL: ENABLED SEARCH
       }
     });
     return response.text;

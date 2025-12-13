@@ -1,41 +1,25 @@
+
 import React, { useEffect, useState } from 'react';
 import { AppSection } from '../types';
-import { LayoutDashboard, Wallet, Activity, Target, Users, LogOut, Clock, BookOpen, Bot, Menu, X, ShieldCheck, Zap, WifiOff, Cloud, Upload, Download, Loader, RefreshCw, Settings, Database, Trash2, Save } from 'lucide-react';
+import { LayoutDashboard, Wallet, Activity, Target, Users, LogOut, Clock, BookOpen, Bot, Menu, X, ShieldCheck, Zap, WifiOff, Cloud, Upload, Download, Loader, RefreshCw, Settings, Database, Trash2, Save, HardDrive, FileJson } from 'lucide-react';
 
 interface Props {
   currentSection: AppSection;
   setSection: (section: AppSection) => void;
   children: React.ReactNode;
-  isFirebaseLive?: boolean;
+  onExport: () => void;
+  onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-export const Layout: React.FC<Props> = ({ currentSection, setSection, children, isFirebaseLive }) => {
+export const Layout: React.FC<Props> = ({ currentSection, setSection, children, onExport, onImport }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  
-  // Settings State
   const [showSettings, setShowSettings] = useState(false);
-  const [configInput, setConfigInput] = useState('');
 
   useEffect(() => {
     if (!document.documentElement.classList.contains('dark')) {
         document.documentElement.classList.add('dark');
     }
-    const savedConfig = localStorage.getItem('firebase_config');
-    if (savedConfig) setConfigInput(savedConfig);
-  }, []);
-
-  useEffect(() => {
-    const handleStatusChange = () => {
-        setIsOnline(navigator.onLine);
-    };
-    window.addEventListener('online', handleStatusChange);
-    window.addEventListener('offline', handleStatusChange);
-    return () => {
-        window.removeEventListener('online', handleStatusChange);
-        window.removeEventListener('offline', handleStatusChange);
-    };
   }, []);
 
   useEffect(() => {
@@ -43,20 +27,9 @@ export const Layout: React.FC<Props> = ({ currentSection, setSection, children, 
     return () => clearInterval(timer);
   }, []);
 
-  const handleSaveConfig = () => {
-      try {
-          JSON.parse(configInput); // Validate JSON
-          localStorage.setItem('firebase_config', configInput);
-          alert("Configuration Saved. Rebooting System...");
-          window.location.reload();
-      } catch (e) {
-          alert("Invalid JSON Format. Please check your config object.");
-      }
-  };
-
-  const handleClearConfig = () => {
-      if(confirm("Disconnect Cloud Database? This will stop real-time sync.")) {
-          localStorage.removeItem('firebase_config');
+  const handleHardReset = () => {
+      if(confirm("⚠ FACTORY RESET: This will wipe ALL local data. Are you sure?")) {
+          localStorage.clear();
           window.location.reload();
       }
   };
@@ -135,19 +108,18 @@ export const Layout: React.FC<Props> = ({ currentSection, setSection, children, 
             <h1 className="text-2xl font-display font-black tracking-tighter italic text-white mb-1 cursor-default">
                 MYLIFE<span className="text-spartan-red text-glow-red">PRO</span>
             </h1>
-            <div className="flex items-center gap-2 mt-3">
-                <span className="text-[9px] font-mono text-electric-blue border border-electric-blue/30 px-1.5 py-0.5 rounded bg-electric-blue/5">SYS v5.0</span>
-                <span className={`flex items-center gap-1 text-[9px] font-bold uppercase border px-2 py-0.5 rounded transition-colors ${isOnline ? 'text-gray-500 border-white/10 bg-white/5' : 'text-red-500 border-red-900/30 bg-red-900/10'}`}>
-                    {isOnline ? (
-                        <>
-                            <Zap size={8} className="text-wealth-green fill-wealth-green animate-pulse"/> Online
-                        </>
-                    ) : (
-                        <>
-                            <WifiOff size={8} className="text-red-500"/> Offline
-                        </>
-                    )}
-                </span>
+            <div className="flex flex-col gap-2 mt-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-mono text-electric-blue border border-electric-blue/30 px-1.5 py-0.5 rounded bg-electric-blue/5">TITANIUM CORE</span>
+                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase border px-2 py-0.5 rounded transition-colors text-gray-500 border-white/10 bg-white/5">
+                        <Zap size={8} className="text-wealth-green fill-wealth-green"/> Local
+                    </span>
+                </div>
+                {/* AUTO-SAVE VISUAL INDICATOR */}
+                <div className="flex items-center gap-2 text-[9px] font-bold uppercase text-wealth-green">
+                    <span className="w-1.5 h-1.5 rounded-full bg-wealth-green animate-pulse"></span>
+                    System Saved
+                </div>
             </div>
         </div>
         
@@ -177,15 +149,35 @@ export const Layout: React.FC<Props> = ({ currentSection, setSection, children, 
         {/* SYSTEM STATUS / CONFIG */}
         <div className="p-4 border-t border-white/5 bg-black/40">
              <div className="flex items-center justify-between">
-                 <div className="flex items-center gap-2">
-                    <Database size={12} className={isFirebaseLive ? "text-green-500 animate-pulse" : "text-gray-500"}/>
-                    <span className={`text-[10px] uppercase font-bold ${isFirebaseLive ? "text-green-500" : "text-gray-500"}`}>
-                        {isFirebaseLive ? "SYSTEM ONLINE" : "SYSTEM OFFLINE"}
+                 <div className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors" onClick={() => setShowSettings(true)} title="Open Data Core Settings">
+                    <HardDrive size={12} className="text-gray-500"/>
+                    <span className="text-[10px] uppercase font-bold text-gray-500 hover:text-white">
+                        DATA CORE
                     </span>
+                    <Settings size={10} className="text-gray-600 hover:text-white"/>
                  </div>
-                 <button onClick={() => setShowSettings(true)} className="text-gray-500 hover:text-white transition-colors p-1 hover:bg-white/10 rounded">
-                     <Settings size={14}/>
-                 </button>
+                 <div className="flex gap-2">
+                    <button 
+                        onClick={onExport} 
+                        className="flex items-center gap-1 bg-blue-900/20 text-blue-400 border border-blue-900/50 hover:bg-blue-900/40 px-2 py-1 rounded text-[10px] uppercase font-bold transition-colors"
+                        title="Save System"
+                    >
+                        <Save size={10} /> Save
+                    </button>
+                    <label 
+                        className="flex items-center gap-1 bg-green-900/20 text-green-400 border border-green-900/50 hover:bg-green-900/40 px-2 py-1 rounded text-[10px] uppercase font-bold transition-colors cursor-pointer"
+                        title="Load System"
+                    >
+                        <Upload size={10} /> Load
+                        <input 
+                            type="file" 
+                            onClick={(e) => (e.currentTarget.value = '')} // CRITICAL FIX: Allow re-selecting same file
+                            onChange={onImport} 
+                            className="hidden" 
+                            accept=".json"
+                        />
+                    </label>
+                 </div>
              </div>
         </div>
       </aside>
@@ -226,9 +218,9 @@ export const Layout: React.FC<Props> = ({ currentSection, setSection, children, 
                       <div className="flex justify-between items-start mb-6">
                           <div>
                               <h3 className="text-xl font-black text-white uppercase flex items-center gap-2">
-                                  <Settings className="text-gray-400" /> System Config
+                                  <HardDrive className="text-blue-500" /> Data Core
                               </h3>
-                              <p className="text-xs text-gray-500 font-mono mt-1">CROSS-DEVICE SYNCHRONIZATION</p>
+                              <p className="text-xs text-gray-500 font-mono mt-1">LOCAL STORAGE MANAGEMENT & SYNC</p>
                           </div>
                           <button onClick={() => setShowSettings(false)} className="text-gray-500 hover:text-white"><X size={24}/></button>
                       </div>
@@ -236,26 +228,38 @@ export const Layout: React.FC<Props> = ({ currentSection, setSection, children, 
                       <div className="space-y-4">
                           <div className="bg-blue-900/10 border border-blue-900/30 p-4 rounded-lg">
                               <h4 className="text-sm font-bold text-blue-400 uppercase mb-2 flex items-center gap-2">
-                                  <Database size={14}/> Firebase Real-Time Setup
+                                  <Save size={14}/> Save System (Backup)
                               </h4>
                               <p className="text-xs text-gray-400 mb-3 leading-relaxed">
-                                  To enable instant sync between Android, iPad, and PC, paste your Firebase Config JSON below. 
-                                  <br/><span className="opacity-50">(Get this from Firebase Console {'>'} Project Settings {'>'} General {'>'} Your Apps)</span>
+                                  Download your entire Life OS (Finance, Habits, Journal, etc.) as a JSON file. Use this to sync between devices manually.
                               </p>
-                              <textarea 
-                                  value={configInput}
-                                  onChange={(e) => setConfigInput(e.target.value)}
-                                  placeholder='{ "apiKey": "...", "authDomain": "...", ... }'
-                                  className="w-full h-32 bg-black border border-gray-700 rounded p-3 text-[10px] font-mono text-gray-300 outline-none focus:border-blue-500"
-                              />
+                              <button onClick={onExport} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold uppercase text-xs shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2">
+                                  <Download size={14} /> Download "Soul File"
+                              </button>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                              <button onClick={handleClearConfig} className="border border-red-900/50 text-red-500 hover:bg-red-900/20 py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2">
-                                  <Trash2 size={14}/> Disconnect
-                              </button>
-                              <button onClick={handleSaveConfig} className="bg-blue-600 hover:bg-blue-500 text-white py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20">
-                                  <Save size={14}/> Save & Reboot
+                          <div className="bg-emerald-900/10 border border-emerald-900/30 p-4 rounded-lg">
+                              <h4 className="text-sm font-bold text-wealth-green uppercase mb-2 flex items-center gap-2">
+                                  <Upload size={14}/> Load System (Restore)
+                              </h4>
+                              <p className="text-xs text-gray-400 mb-3 leading-relaxed">
+                                  Overwrite current app data with a backup file. <span className="text-spartan-red">Warning: Current data will be replaced.</span>
+                              </p>
+                              <label className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded font-bold uppercase text-xs shadow-lg shadow-emerald-900/20 transition-all cursor-pointer flex items-center justify-center gap-2">
+                                  <FileJson size={14} /> <span>Select Backup File</span>
+                                  <input 
+                                    type="file" 
+                                    onClick={(e) => (e.currentTarget.value = '')} // CRITICAL FIX
+                                    onChange={onImport} 
+                                    className="hidden" 
+                                    accept=".json"
+                                  />
+                              </label>
+                          </div>
+
+                          <div className="border-t border-gray-800 pt-4 mt-2">
+                              <button onClick={handleHardReset} className="w-full border border-red-900/50 text-red-500 hover:bg-red-900/20 py-3 rounded font-bold uppercase text-xs flex items-center justify-center gap-2">
+                                  <Trash2 size={14}/> Factory Reset (Clear All)
                               </button>
                           </div>
                       </div>

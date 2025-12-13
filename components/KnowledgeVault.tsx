@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Book, Plus, Brain, Sparkles, ChevronDown, ChevronUp, Search, X, Zap, DollarSign, Dumbbell, Target, Upload, FileText, Youtube, Image as ImageIcon, Save, Edit2, FileType, Pencil, Loader, CheckCircle, Lightbulb, Play, AlertTriangle, Crosshair, ArrowRight, Library, Scroll, Table, Music, FileSpreadsheet, Cloud, Download, RefreshCw, Settings, HardDrive, Trash2 } from 'lucide-react';
+import { Book, Plus, Brain, Sparkles, ChevronDown, ChevronUp, Search, X, Zap, DollarSign, Dumbbell, Target, Upload, FileText, Youtube, Image as ImageIcon, Save, Edit2, FileType, Pencil, Loader, CheckCircle, Lightbulb, Play, AlertTriangle, Crosshair, ArrowRight, Library, Scroll, Table, Music, FileSpreadsheet, Cloud, Download, RefreshCw, Settings, HardDrive, Trash2, Globe } from 'lucide-react';
 import { Book as BookType, NeuralNote } from '../types';
 import { processNeuralInput } from '../services/geminiService';
 import { THE_CODEX } from '../constants';
@@ -23,6 +24,7 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
   // --- NEURAL SCANNER STATE ---
   const [scanMode, setScanMode] = useState<'TEXT' | 'FILE'>('TEXT');
   const [scanInputText, setScanInputText] = useState('');
+  const [scanContext, setScanContext] = useState(''); // NEW: Title/Context
   const [scanFileBase64, setScanFileBase64] = useState<string | null>(null);
   const [scanFileType, setScanFileType] = useState<string>(''); // Mime type
   const [scanFileName, setScanFileName] = useState<string>('');
@@ -85,8 +87,10 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
   };
 
   const handleRestoreBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      const input = e.target;
+      const file = input.files?.[0];
       if (!file) return;
+      
       const reader = new FileReader();
       reader.onload = (event) => {
           try {
@@ -97,25 +101,25 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                       setSyncMsg("System Restored Successfully.");
                   }
               } else {
-                  alert("Invalid Format");
+                  alert("Invalid Format: Expected an array of books.");
               }
           } catch(e) {
               alert("Corrupt File");
+          } finally {
+              input.value = ''; // Reset input to allow selecting same file again
           }
       };
       reader.readAsText(file);
   };
 
-  // ... (Scan Logic and Other Handlers remain same) ...
   const simulateScanStages = () => {
       const stages = [
-          "Initializing Neural Handshake...",
-          "Detecting Media Type (Video/Song/Doc)...",
-          "Fetching Script & Lyrics (Exact Source)...",
-          "Analyzing Raw Emotion & Meaning...",
-          "Translating (Jemon Ashe Temon)...",
-          "Generating Executive Brief...",
-          "Compiling Excel-Format Data..."
+          "📡 Initiating Deep Search Protocol...",
+          "🔍 Hunting for Full Transcript/Lyrics...",
+          "🧬 Analyzing Source Material...",
+          "⚖️ Extracting Hidden Meanings...",
+          "🌍 Translating to Native Context...",
+          "📊 Formatting Matrix Data...",
       ];
       let i = 0;
       setScanStage(stages[0]);
@@ -123,7 +127,7 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
           i++;
           if (i < stages.length) setScanStage(stages[i]);
           else clearInterval(interval);
-      }, 1000); 
+      }, 1500); 
       return interval;
   };
 
@@ -137,19 +141,16 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
     const resultJson = await processNeuralInput(
         scanInputText, 
         scanMode === 'FILE' ? scanFileBase64 : null, 
-        scanMode === 'FILE' ? scanFileType : 'text/plain'
+        scanMode === 'FILE' ? scanFileType : 'text/plain',
+        scanContext
     );
     
     clearInterval(stageInterval);
 
     try {
-        let cleanJson = resultJson;
-        // Strip markdown if present
-        if (cleanJson.includes("```json")) {
-            cleanJson = cleanJson.replace(/```json/g, "").replace(/```/g, "");
-        } else if (cleanJson.includes("```")) {
-            cleanJson = cleanJson.replace(/```/g, "");
-        }
+        // Robust JSON Parsing: Find first '{' and last '}'
+        const jsonMatch = resultJson.match(/\{[\s\S]*\}/);
+        const cleanJson = jsonMatch ? jsonMatch[0] : resultJson;
 
         const parsed = JSON.parse(cleanJson);
         const newNotes: NeuralNote[] = parsed.notes.map((n: any) => ({
@@ -163,12 +164,12 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
             timestamp: new Date().toISOString()
         }));
         
-        const generatedTitle = parsed.title || (scanMode === 'FILE' ? scanFileName : (scanInputText.substring(0, 30) || "Scanned Content"));
+        const generatedTitle = parsed.title || (scanMode === 'FILE' ? scanFileName : (scanContext || scanInputText.substring(0, 30) || "Scanned Content"));
         setScanResultTitle(generatedTitle);
         setScanSummary(parsed.summary || "");
         setScannedNotes(newNotes);
     } catch (e) {
-        alert("Neural Decode Failed. The AI response was not valid JSON. Please try again.");
+        alert("Neural Decode Failed. The AI response was not valid JSON. Please try again with a clear context/title.");
         console.error("JSON Parse Error", e, resultJson);
     }
     setIsScanning(false);
@@ -230,6 +231,7 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
     setScanResultTitle('');
     setScanSummary('');
     setScanInputText('');
+    setScanContext('');
     setScanFileBase64(null);
     setScanFileName('');
     setScanFileType('');
@@ -444,25 +446,39 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
         {/* --- EXPERT NEURAL SCANNER --- */}
         <div className="bg-gradient-to-br from-slate-900 to-purple-950/20 border border-purple-500/30 p-6 rounded-lg relative overflow-hidden shadow-lg shadow-purple-900/10">
             
-            <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="text-purple-400 animate-pulse" />
-                <h3 className="text-xl font-bold text-white uppercase">Neural Scanner (Super Expert)</h3>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="text-purple-400 animate-pulse" />
+                    <h3 className="text-xl font-bold text-white uppercase">Neural Scanner (Forensic Mode)</h3>
+                </div>
+                <div className="flex items-center gap-2 px-2 py-1 bg-purple-900/20 rounded border border-purple-500/30">
+                    <Globe size={12} className="text-purple-400"/>
+                    <span className="text-[10px] text-purple-200 font-bold uppercase">Deep Web Search Active</span>
+                </div>
             </div>
 
             {/* Scanner Tabs */}
             <div className="flex gap-2 mb-4">
-                <button onClick={() => setScanMode('TEXT')} className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all ${scanMode === 'TEXT' ? 'bg-purple-600 text-white' : 'bg-black border border-gray-700 text-gray-400'}`}><Youtube size={14}/> YouTube / Text</button>
+                <button onClick={() => setScanMode('TEXT')} className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all ${scanMode === 'TEXT' ? 'bg-purple-600 text-white' : 'bg-black border border-gray-700 text-gray-400'}`}><Youtube size={14}/> YouTube / URL</button>
                 <button onClick={() => setScanMode('FILE')} className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all ${scanMode === 'FILE' ? 'bg-purple-600 text-white' : 'bg-black border border-gray-700 text-gray-400'}`}><Upload size={14}/> File</button>
             </div>
 
             {/* Input Area */}
             <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 relative">
+                <div className="flex-1 relative space-y-2">
+                    {/* NEW CONTEXT INPUT */}
+                    <input 
+                        value={scanContext}
+                        onChange={(e) => setScanContext(e.target.value)}
+                        placeholder="Content Title / Context (REQUIRED for Accuracy)"
+                        className="w-full bg-black/80 border border-gray-700 p-2 text-white rounded focus:border-purple-500 outline-none text-xs font-bold"
+                    />
+
                     {scanMode === 'TEXT' ? (
                         <textarea 
                             value={scanInputText}
                             onChange={(e) => setScanInputText(e.target.value)}
-                            placeholder="Paste YouTube Link (Song/Talk) or Text here. The AI will extract exact Script/Lyrics and translate line-by-line (Jemon Ashe Temon)."
+                            placeholder="Paste YouTube Link or Article URL here. The System will HUNT down the transcript."
                             className="w-full h-32 bg-black/80 border border-gray-700 p-3 text-white rounded focus:border-purple-500 outline-none font-mono text-xs"
                         />
                     ) : (
@@ -481,9 +497,10 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                     
                     {/* SCANNING OVERLAY */}
                     {isScanning && (
-                        <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center rounded z-10">
+                        <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center rounded z-10 border border-purple-500/20">
                             <Loader className="animate-spin text-purple-500 mb-2" size={32} />
                             <p className="text-purple-400 font-mono font-bold text-xs uppercase animate-pulse">{scanStage}</p>
+                            <p className="text-[10px] text-gray-500 mt-2 font-mono">DO NOT CLOSE WINDOW</p>
                         </div>
                     )}
                 </div>
@@ -495,7 +512,7 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
                         className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded uppercase text-xs tracking-wider transition-colors disabled:opacity-50 flex items-center justify-center gap-2 h-12 w-full md:w-auto shadow-lg shadow-purple-900/50"
                     >
                         {isScanning ? <Brain className="animate-spin"/> : <Zap size={16}/>}
-                        {isScanning ? "PROCESSING..." : "DEEP SCAN"}
+                        {isScanning ? "HUNTING DATA..." : "DEEP SCAN"}
                     </button>
                     {scanMode === 'FILE' && scanFileName && <button onClick={resetScanner} className="text-[10px] text-gray-500 hover:text-red-500 uppercase font-bold">Clear File</button>}
                 </div>

@@ -1,5 +1,5 @@
 
-import { UserProfile, SpartanDayPlan, GymExercise, Book, Habit, CodexChapter } from './types';
+import { UserProfile, SpartanDayPlan, GymExercise, Book, Habit, CodexChapter, JournalTask } from './types';
 
 export const INFLATION_RATE_BD = 0.085; // 8.5%
 export const INVESTMENT_RETURN_RATE = 0.12; // 12%
@@ -14,9 +14,6 @@ export const INITIAL_USER_PROFILE: UserProfile = {
   level: 1,
   rank: "Recruit"
 };
-
-// ... [Keep existing constants: RICH_VS_POOR_MINDSET, WEALTH_TIMELINE, SECRETS_OF_RICH_7, WEALTH_PRINCIPLES_BANGLA, BUSINESS_STAGES, RULES, FLASH_CARDS, INITIAL_HABITS, INITIAL_LIBRARY, SPARTAN_CHECKLIST_ITEMS, HEALTH_KNOWLEDGE_BASE, GYM ROUTINES, SPARTAN_MASTER_CYCLE, MORNING_PROTOCOL, DAYTIME_PROTOCOL, MASCULINE_MINDSET_CHECKLIST, FINANCIAL_DISCIPLINE_CHECKLIST, INITIAL_STRATEGIC_OBJECTIVES, RULES_OF_POWER_13, RULES_OF_ATTRACTION_7, WEALTH_BLUEPRINT_ROADMAP, WEALTH_BLUEPRINT_MYTHS, WEALTH_BLUEPRINT_VEHICLES] ...
-// (Re-declaring standard constants for context)
 
 export const RICH_VS_POOR_MINDSET = [
   { poor: "টাকা নেই বলেই কিছু করতে পারি না (Can't do because no money)", rich: "Create! Don't consume. Money follows value." },
@@ -238,6 +235,8 @@ export const SPARTAN_MASTER_CYCLE: SpartanDayPlan[] = Array.from({ length: 31 },
   };
 });
 
+// --- UPDATED PROTOCOLS FROM DUMP ---
+
 export const MORNING_PROTOCOL = [
   "⏰ Wake up early (before 6am)",
   "🏋️ Morning exercise (30 min)",
@@ -245,23 +244,23 @@ export const MORNING_PROTOCOL = [
   "📖 Read (30 min / 10+ pages)/writing",
   "💧 Hydrate (8 glasses / 2L water)",
   "📓 Write top 3 priorities",
-  "🎯 What's one thing to make me proud?/visualization",
-  "🧠 How do I want to feel today? Positive affirmation",
-  "🔒 No social media before 9am/masturbation",
-  "🎯 How will I stay focused? Deep work (2 hrs)"
+  "🎯 What's one thing to make me proud? (Visualization)",
+  "🧠 Positive affirmation (How do I want to feel?)",
+  "🔒 No social media before 9am / No Masturbation",
+  "🎯 Deep work (2 hrs) - Stay Focused"
 ];
 
 export const DAYTIME_PROTOCOL = [
   "🎯 Eat That Frog (hardest first)",
-  "📅 Plan tomorrow (10 min) & Review today",
+  "📅 Plan tomorrow (10 min) & Review progress",
   "🔑 Be Proactive (initiative)",
-  "🛠️ Begin with End in Mind & Reflection",
+  "🛠️ Begin with End in Mind & Reflection & Journaling",
   "🧩 Put First Things First",
   "🤝 Think Win-Win",
   "⚖️ Control Over Emotion",
   "👂 Seek First to Understand",
   "🌍 Synergize (collaborate)",
-  "🔁 Sharpen the Saw (renew) & No screens 1hr before bed"
+  "🔁 Sharpen the Saw (Renew) & No screens 1hr before bed"
 ];
 
 export const MASCULINE_MINDSET_CHECKLIST = [
@@ -271,12 +270,12 @@ export const MASCULINE_MINDSET_CHECKLIST = [
   "🌐 Power of Network",
   "🕴️ Open body language",
   "🧘 Calm mind",
-  "📚 Invest/grow skills",
+  "📚 Invest/grow skills - Learn/Invest today?",
   "📝 Create daily study/work routine",
   "📌 Practice consistently",
   "📊 Track failures & learn",
   "📖 Disappear with direction (Self Learning)",
-  "🎯 Define clear goal"
+  "🎯 Define clear goal - Eat That Frog First"
 ];
 
 export const FINANCIAL_DISCIPLINE_CHECKLIST = [
@@ -294,16 +293,16 @@ export const FINANCIAL_DISCIPLINE_CHECKLIST = [
   "📊 Progress toward goal?"
 ];
 
-export const INITIAL_STRATEGIC_OBJECTIVES = [
-  { id: '1', category: '🎯 MAJOR GOALS', task: 'Electronics 2 registration and pass', status: 'Not Started', priority: 'Medium', progress: 0, notes: '✅' },
-  { id: '2', category: '🎯 MAJOR GOALS', task: 'GRE QUANT preparation', status: 'Not Started', priority: 'Medium', progress: 0, notes: '✅' },
-  { id: '3', category: '🎯 MAJOR GOALS', task: 'IELTS/GRE Registration', status: 'Not Started', priority: 'Medium', progress: 0, notes: '✅' },
-  { id: '4', category: '🎯 MAJOR GOALS', task: 'SOP + University applications', status: 'Not Started', priority: 'Medium', progress: 0, notes: '✅' },
-  { id: '5', category: '🎯 MAJOR GOALS', task: 'Portfolio website', status: 'In Progress', priority: 'Medium', progress: 50, notes: '✅' },
-  { id: '6', category: '💪 PERSONAL', task: 'Control Emotions (stay calm)', status: 'Not Started', priority: 'High', progress: 0, notes: 'Positive affirmation' },
-  { id: '7', category: '💪 PERSONAL', task: 'Strategic Mindset', status: 'Not Started', priority: 'Medium', progress: 0, notes: 'Mindfulness' },
+export const INITIAL_STRATEGIC_OBJECTIVES: JournalTask[] = [
+  { id: '1', category: '🎯 MAJOR GOALS', task: 'Electronics 2 registration and pass', status: 'Not Started', priority: 'Medium', progress: 0, notes: 'Must pass' },
+  { id: '2', category: '🎯 MAJOR GOALS', task: 'GRE QUANT preparation', status: 'Not Started', priority: 'Medium', progress: 0, notes: 'Daily practice' },
+  { id: '3', category: '🎯 MAJOR GOALS', task: 'IELTS/GRE Registration', status: 'Not Started', priority: 'Medium', progress: 0, notes: 'Check dates' },
+  { id: '4', category: '🎯 MAJOR GOALS', task: 'SOP + University applications', status: 'Not Started', priority: 'Medium', progress: 0, notes: 'Draft 1' },
+  { id: '5', category: '🎯 MAJOR GOALS', task: 'Portfolio website', status: 'In Progress', priority: 'Medium', progress: 50, notes: 'Deploy V1' },
+  { id: '6', category: '💪 PERSONAL', task: 'Control Emotions (stay calm)', status: 'In Progress', priority: 'High', progress: 0, notes: 'Positive affirmation' },
+  { id: '7', category: '💪 PERSONAL', task: 'No masturbation', status: 'In Progress', priority: 'High', progress: 0, notes: 'Retention' },
   { id: '8', category: '💰 FINANCE', task: 'Save 10% of income', status: 'Not Started', priority: 'High', progress: 0, notes: 'Build wealth' },
-  { id: '9', category: '📚 ACADEMIC', task: 'Electronics 2 - Daily 2hr', status: 'In Progress', priority: 'High', progress: 66, notes: 'Must pass' },
+  { id: '9', category: '📚 ACADEMIC', task: 'Electronics 2 - Daily 2hr', status: 'In Progress', priority: 'High', progress: 66, notes: 'Target B+' },
   { id: '10', category: '📚 ACADEMIC', task: 'University Shortlist', status: 'Not Started', priority: 'High', progress: 0, notes: 'Target: 10 unis' },
   { id: '11', category: '🎯 GOALS', task: 'MS Application Fall 2026', status: 'In Progress', priority: 'High', progress: 25, notes: 'Top priority' },
   { id: '12', category: '🎯 GOALS', task: 'Read 2 books/month', status: 'In Progress', priority: 'Medium', progress: 30, notes: 'Current: 0.6 books' },

@@ -10,7 +10,15 @@ export interface FinancialState {
   loans: LoanLiability[];
   legacyProjects: LegacyProject[];
   budgetSnapshots: MonthlyBudgetSnapshot[];
-  mindsetLogs: MoneyMindsetLog[]; // NEW
+  mindsetLogs: MoneyMindsetLog[];
+  roadmapSettings?: RoadmapSettings; // NEW: For the 5-Step Plan
+}
+
+export interface RoadmapSettings {
+  targetMonthlyExpense: number;
+  sipAmount: number;
+  hasStartedSIP: boolean;
+  activePhase: 1 | 2 | 3 | 4 | 5;
 }
 
 export interface MoneyMindsetLog {
@@ -95,7 +103,39 @@ export interface Task {
   deadline: string;
   category: 'Exam' | 'Skill' | 'Project';
   status: 'Pending' | 'Done' | 'Failed';
+  progress?: number; // Added for detailed tracking
+  notes?: string; // Added for detailed tracking
   urgent: boolean;
+}
+
+// NEW: For Strategic Objectives & Daily Journal
+export interface JournalTask {
+    id: string;
+    category: string;
+    task: string;
+    status: string; // Not Started, In Progress, Done
+    priority: string;
+    progress: number;
+    notes: string;
+    dueDate?: string;
+}
+
+export interface DailyAction {
+    id: string;
+    category: string;
+    task: string;
+    status: string; // Not Started, In Progress, Done
+    priority: string;
+    progress: number;
+    notes: string;
+    isCompleted?: boolean; // Legacy support
+}
+
+export interface ChecklistState {
+  morning: Record<string, boolean>;
+  daytime: Record<string, boolean>;
+  mindset: Record<string, boolean>;
+  finance: Record<string, boolean>;
 }
 
 // NEW: Advanced Learning Point Structure
