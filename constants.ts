@@ -1,4 +1,5 @@
 
+
 import { UserProfile, SpartanDayPlan, GymExercise, Book, Habit, CodexChapter, JournalTask } from './types';
 
 export const INFLATION_RATE_BD = 0.085; // 8.5%
@@ -679,4 +680,48 @@ export const THE_CODEX: CodexChapter[] = [
       }
     ]
   }
+];
+
+export const KAIZEN_PRINCIPLES = [
+  "Small improvements everyday (1% rule).",
+  "Process over outcome.",
+  "Mistakes are data, not failure.",
+  "Ask 'Why?' 5 times to find root cause.",
+  "Eliminate waste (Muda)."
+];
+
+export const BEZOS_STEPS = [
+  "1. Obsess Over Customers",
+  "2. Invent and Wander",
+  "3. Think Long Term",
+  "4. It is Always Day 1",
+  "5. High Velocity Decisions"
+];
+
+export const LIFE_MISSION = [
+  "WORSHIP ALLAH • SERVE FAMILY",
+  "ACHIEVE FINANCIAL SOVEREIGNTY",
+  "OPTIMIZE BIOLOGICAL VESSEL",
+  "ACQUIRE & DISTRIBUTE WISDOM"
+];
+
+export const LIFE_RULES = [
+  "Disappear for 6 months to do deep work.",
+  "Your network is your net worth.",
+  "Don't take advice from people less successful than you.",
+  "Health is the first wealth.",
+  "Compound interest applies to knowledge and relationships too.",
+  "Silence is better than unnecessary speech.",
+  "Always deliver more than expected.",
+  "Take extreme ownership of your life.",
+  "Learn to sell, learn to build.",
+  "Memento Mori - Remember you will die."
+];
+
+export const CRITICAL_THINKING_LEVELS = [
+  { level: 1, title: "Unreflective", desc: "Unaware of bias. Reacts emotionally." },
+  { level: 2, title: "Challenged", desc: "Aware of bias but struggles to fix it." },
+  { level: 3, title: "Beginning", desc: "Tries to use logic but inconsistent." },
+  { level: 4, title: "Practicing", desc: "Systematically analyzes problems." },
+  { level: 5, title: "Advanced", desc: "Intuitive, logical, and fair-minded." }
 ];

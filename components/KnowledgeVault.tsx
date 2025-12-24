@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Book, Plus, Brain, Sparkles, ChevronDown, ChevronUp, Search, X, Zap, DollarSign, Dumbbell, Target, Upload, FileText, Youtube, Image as ImageIcon, Save, Edit2, FileType, Pencil, Loader, CheckCircle, Lightbulb, Play, AlertTriangle, Crosshair, ArrowRight, Library, Scroll, Table, Music, FileSpreadsheet, Cloud, Download, RefreshCw, Settings, HardDrive, Trash2, Globe } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Book, Plus, Brain, Sparkles, ChevronDown, ChevronUp, Search, X, Zap, DollarSign, Dumbbell, Target, Upload, FileText, Youtube, Image as ImageIcon, Save, Edit2, FileType, Pencil, Loader, CheckCircle, Lightbulb, Play, AlertTriangle, Crosshair, ArrowRight, Library, Scroll, Table, Music, FileSpreadsheet, Cloud, Download, RefreshCw, Settings, HardDrive, Trash2, Globe, Terminal, Cpu, Layers, Maximize2, Clipboard } from 'lucide-react';
 import { Book as BookType, NeuralNote } from '../types';
 import { processNeuralInput } from '../services/geminiService';
 import { THE_CODEX } from '../constants';
@@ -31,6 +31,7 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
   
   const [isScanning, setIsScanning] = useState(false);
   const [scanStage, setScanStage] = useState(''); // For loading animation
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [scannedNotes, setScannedNotes] = useState<NeuralNote[]>([]);
   const [scanResultTitle, setScanResultTitle] = useState('');
   const [scanSummary, setScanSummary] = useState(''); // Executive Brief
@@ -53,24 +54,7 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
   const [addingNoteBookId, setAddingNoteBookId] = useState<string | null>(null);
   const [newNoteForm, setNewNoteForm] = useState<{concept: string, action: string, problem: string, example: string, category: string}>({concept: '', action: '', problem: '', example: '', category: 'MIND'});
 
-  // --- DATA CORE (SYNC) STATE ---
-  const [showDataCore, setShowDataCore] = useState(false);
-  const [syncMsg, setSyncMsg] = useState('');
-
   // --- HANDLERS ---
-
-  const handleDownloadBackup = () => {
-      const content = JSON.stringify(books, null, 2);
-      const blob = new Blob([content], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `neural_vault_backup_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setSyncMsg("Local Backup Generated.");
-  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,48 +70,37 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
     }
   };
 
-  const handleRestoreBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const input = e.target;
-      const file = input.files?.[0];
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = (event) => {
-          try {
-              const parsed = JSON.parse(event.target?.result as string);
-              if (Array.isArray(parsed)) {
-                  if(confirm(`Restore ${parsed.length} books? Current data will be replaced.`)) {
-                      setBooks(parsed);
-                      setSyncMsg("System Restored Successfully.");
-                  }
-              } else {
-                  alert("Invalid Format: Expected an array of books.");
-              }
-          } catch(e) {
-              alert("Corrupt File");
-          } finally {
-              input.value = ''; // Reset input to allow selecting same file again
-          }
-      };
-      reader.readAsText(file);
+  const handlePaste = async () => {
+      try {
+          const text = await navigator.clipboard.readText();
+          setScanInputText(text);
+      } catch (err) {
+          console.error('Failed to read clipboard contents: ', err);
+      }
   };
 
   const simulateScanStages = () => {
       const stages = [
-          "📡 Initiating Deep Search Protocol...",
-          "🔍 Hunting for Full Transcript/Lyrics...",
-          "🧬 Analyzing Source Material...",
-          "⚖️ Extracting Hidden Meanings...",
-          "🌍 Translating to Native Context...",
-          "📊 Formatting Matrix Data...",
+          "📡 ESTABLISHING SECURE UPLINK...",
+          "🔍 SEARCHING GLOBAL INTELLIGENCE GRID...",
+          "🧬 DECODING SEMANTIC STRUCTURE...",
+          "⚖️ ANALYZING TRUTH VECTORS...",
+          "🌍 TRANSLATING TO NATIVE CONTEXT...",
+          "📊 COMPILING TACTICAL MATRIX...",
+          "✅ PROTOCOL COMPLETE."
       ];
       let i = 0;
+      setTerminalLogs([]);
       setScanStage(stages[0]);
       const interval = setInterval(() => {
-          i++;
-          if (i < stages.length) setScanStage(stages[i]);
-          else clearInterval(interval);
-      }, 1500); 
+          if (i < stages.length) {
+              setTerminalLogs(prev => [...prev, stages[i]]);
+              setScanStage(stages[i]);
+              i++;
+          } else {
+              clearInterval(interval);
+          }
+      }, 800); 
       return interval;
   };
 
@@ -169,11 +142,61 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
         setScanSummary(parsed.summary || "");
         setScannedNotes(newNotes);
     } catch (e) {
-        alert("Neural Decode Failed. The AI response was not valid JSON. Please try again with a clear context/title.");
-        console.error("JSON Parse Error", e, resultJson);
+        // Fallback for plain text responses (like "I am sorry...")
+        console.warn("JSON Parse Error, falling back to raw text", e);
+        setScanResultTitle("System Report (Raw Output)");
+        setScanSummary(resultJson); // Put the raw text here
+        setScannedNotes([{
+            id: Date.now().toString(),
+            concept: "System Notification",
+            action: "Review the raw output summary above.",
+            problem: "Structured data extraction failed.",
+            example: "The AI might have returned a conversational response instead of JSON.",
+            iconCategory: 'MIND',
+            sourceType: 'TEXT',
+            timestamp: new Date().toISOString()
+        }]);
     }
     setIsScanning(false);
     setScanStage('');
+    setTerminalLogs([]);
+  };
+
+  const handleExportToExcel = () => {
+    if (scannedNotes.length === 0) return;
+
+    // Define CSV Headers
+    const headers = ["Concept / Key Point", "Root Problem (Why)", "Action Protocol (Do This)", "Evidence / Example", "Category"];
+    
+    // Map data to CSV rows, handling quotes properly for Excel
+    const csvRows = [
+        headers.join(','), // Header row
+        ...scannedNotes.map(note => {
+            const row = [
+                note.concept,
+                note.problem,
+                note.action,
+                note.example,
+                note.iconCategory
+            ].map(field => {
+                // Escape double quotes by doubling them, then wrap field in quotes
+                const stringField = String(field || '');
+                return `"${stringField.replace(/"/g, '""')}"`;
+            });
+            return row.join(',');
+        })
+    ].join('\n');
+
+    // Create Blob with BOM (Byte Order Mark) for Excel UTF-8 compatibility
+    const blob = new Blob(["\uFEFF" + csvRows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    // Naming the file .csv so Excel opens it automatically
+    link.download = `NEURAL_SCAN_EXPORT_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const saveScannedNotesToBook = (bookId: string) => {
@@ -381,279 +404,254 @@ export const KnowledgeVault: React.FC<Props> = ({ books, setBooks }) => {
            <p className="text-xs text-purple-400 font-mono font-bold mt-1">NEURAL UPGRADE PROTOCOL • SUPER EXPERT MODE</p>
         </div>
         <div className="flex gap-2">
-            <button onClick={() => setShowDataCore(true)} className="px-3 py-2 rounded text-xs font-bold uppercase flex items-center gap-1 bg-slate-900 text-blue-400 border border-blue-900/50 hover:bg-blue-900/20 hover:border-blue-500 transition-all shadow-[0_0_10px_rgba(41,121,255,0.2)]">
-                <Cloud size={14}/> Data Core
-            </button>
             <button onClick={() => setActiveTab('LIBRARY')} className={`px-4 py-2 rounded text-xs font-bold uppercase flex items-center gap-2 transition-all ${activeTab === 'LIBRARY' ? 'bg-white text-black' : 'bg-slate-900 text-gray-400 hover:text-white'}`}><Library size={14} /> Library</button>
             <button onClick={() => setActiveTab('CODEX')} className={`px-4 py-2 rounded text-xs font-bold uppercase flex items-center gap-2 transition-all ${activeTab === 'CODEX' ? 'bg-purple-600 text-white' : 'bg-slate-900 text-gray-400 hover:text-white'}`}><Scroll size={14} /> The Codex</button>
         </div>
       </header>
 
-      {/* DATA CORE MODAL */}
-      {showDataCore && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-slate-950 border border-blue-500/50 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl relative">
-                  <div className="p-6">
-                      <div className="flex justify-between items-start mb-6">
-                          <div>
-                              <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2">
-                                  <Cloud className="text-blue-500" /> Data Core Uplink
-                              </h3>
-                              <p className="text-xs text-blue-400 font-mono mt-1">SECURE SYNCHRONIZATION PROTOCOL</p>
-                          </div>
-                          <button onClick={() => setShowDataCore(false)} className="text-gray-500 hover:text-white"><X size={24}/></button>
-                      </div>
-
-                      {/* Status Display */}
-                      <div className="bg-black border border-gray-800 rounded p-4 mb-6 text-center">
-                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">LOCAL STATUS</p>
-                          <p className={`text-sm font-mono font-bold ${syncMsg ? 'text-green-500' : 'text-gray-300'}`}>
-                              {syncMsg || 'SYSTEM READY'}
-                          </p>
-                      </div>
-
-                      {/* ACTIONS */}
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                          {/* Local Backup */}
-                          <div className="col-span-2 p-3 bg-slate-900/50 border border-gray-700 rounded flex justify-between items-center">
-                              <div>
-                                  <p className="text-white font-bold text-sm flex items-center gap-2"><HardDrive size={14}/> Titanium Backup</p>
-                                  <p className="text-[10px] text-gray-500">Save complete JSON to device</p>
-                              </div>
-                              <button onClick={handleDownloadBackup} className="bg-white text-black px-3 py-1.5 rounded text-xs font-bold uppercase hover:bg-gray-200">
-                                  Download
-                              </button>
-                          </div>
-
-                          <div className="col-span-2 p-3 bg-slate-900/50 border border-gray-700 rounded flex justify-between items-center">
-                              <div>
-                                  <p className="text-white font-bold text-sm flex items-center gap-2"><Upload size={14}/> Restore Data</p>
-                                  <p className="text-[10px] text-gray-500">Load JSON backup</p>
-                              </div>
-                              <label className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold uppercase hover:bg-gray-700 cursor-pointer border border-gray-600">
-                                  Select File
-                                  <input type="file" onChange={handleRestoreBackup} className="hidden" accept=".json"/>
-                              </label>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      )}
-
       {activeTab === 'CODEX' ? renderCodex() : (
       <>
-        {/* --- EXPERT NEURAL SCANNER --- */}
-        <div className="bg-gradient-to-br from-slate-900 to-purple-950/20 border border-purple-500/30 p-6 rounded-lg relative overflow-hidden shadow-lg shadow-purple-900/10">
+        {/* --- EXPERT NEURAL SCANNER (TERMINAL UPGRADE) --- */}
+        <div className="bg-slate-950 border border-purple-500/20 rounded-xl overflow-hidden shadow-2xl relative group">
+            {/* Terminal Decoration */}
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none"></div>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/5 rounded-full blur-3xl pointer-events-none"></div>
             
-            <div className="flex items-center justify-between mb-4">
+            {/* Header */}
+            <div className="bg-black/50 border-b border-purple-900/30 p-4 flex justify-between items-center relative z-10">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-900/20 rounded border border-purple-500/30 animate-pulse">
+                        <Terminal size={18} className="text-purple-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-black text-white uppercase tracking-widest flex items-center gap-2">
+                            Neural Scanner <span className="text-[9px] bg-purple-600 text-white px-1.5 py-0.5 rounded font-mono">FORENSIC v9.0</span>
+                        </h3>
+                        <p className="text-[10px] text-gray-500 font-mono tracking-wide">SHADOW-NET SEARCH ENABLED • DEEP SEMANTIC EXTRACTION</p>
+                    </div>
+                </div>
                 <div className="flex items-center gap-2">
-                    <Sparkles className="text-purple-400 animate-pulse" />
-                    <h3 className="text-xl font-bold text-white uppercase">Neural Scanner (Forensic Mode)</h3>
-                </div>
-                <div className="flex items-center gap-2 px-2 py-1 bg-purple-900/20 rounded border border-purple-500/30">
-                    <Globe size={12} className="text-purple-400"/>
-                    <span className="text-[10px] text-purple-200 font-bold uppercase">Deep Web Search Active</span>
+                    <span className="text-[9px] font-mono text-purple-500 border border-purple-900 px-2 py-1 rounded bg-purple-900/10 flex items-center gap-1">
+                        <Globe size={10}/> GLOBAL INTEL
+                    </span>
                 </div>
             </div>
 
-            {/* Scanner Tabs */}
-            <div className="flex gap-2 mb-4">
-                <button onClick={() => setScanMode('TEXT')} className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all ${scanMode === 'TEXT' ? 'bg-purple-600 text-white' : 'bg-black border border-gray-700 text-gray-400'}`}><Youtube size={14}/> YouTube / URL</button>
-                <button onClick={() => setScanMode('FILE')} className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all ${scanMode === 'FILE' ? 'bg-purple-600 text-white' : 'bg-black border border-gray-700 text-gray-400'}`}><Upload size={14}/> File</button>
-            </div>
-
-            {/* Input Area */}
-            <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 relative space-y-2">
-                    {/* NEW CONTEXT INPUT */}
-                    <input 
-                        value={scanContext}
-                        onChange={(e) => setScanContext(e.target.value)}
-                        placeholder="Content Title / Context (REQUIRED for Accuracy)"
-                        className="w-full bg-black/80 border border-gray-700 p-2 text-white rounded focus:border-purple-500 outline-none text-xs font-bold"
-                    />
-
-                    {scanMode === 'TEXT' ? (
-                        <textarea 
-                            value={scanInputText}
-                            onChange={(e) => setScanInputText(e.target.value)}
-                            placeholder="Paste YouTube Link or Article URL here. The System will HUNT down the transcript."
-                            className="w-full h-32 bg-black/80 border border-gray-700 p-3 text-white rounded focus:border-purple-500 outline-none font-mono text-xs"
+            <div className="p-6 relative z-10 space-y-6">
+                
+                {/* 1. CONFIGURATION STRIP */}
+                <div className="flex flex-wrap gap-4 items-center bg-purple-900/5 p-3 rounded border border-purple-900/20">
+                    <div className="flex bg-black p-1 rounded border border-gray-800">
+                        <button onClick={() => setScanMode('TEXT')} className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all ${scanMode === 'TEXT' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'text-gray-500 hover:text-white'}`}><Youtube size={14}/> URL / Text</button>
+                        <button onClick={() => setScanMode('FILE')} className={`flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase transition-all ${scanMode === 'FILE' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'text-gray-500 hover:text-white'}`}><Upload size={14}/> File Uplink</button>
+                    </div>
+                    <div className="h-8 w-[1px] bg-purple-900/30"></div>
+                    <div className="flex-1">
+                        <input 
+                            value={scanContext}
+                            onChange={(e) => setScanContext(e.target.value)}
+                            placeholder="SET TARGET CONTEXT (e.g. 'Extract Investment Rules' or 'Analyze for Bias')"
+                            className="w-full bg-black border border-gray-800 text-white text-xs font-mono p-2.5 rounded focus:border-purple-500 outline-none placeholder-gray-600"
                         />
+                    </div>
+                </div>
+
+                {/* 2. MAIN INPUT TERMINAL */}
+                <div className="relative group">
+                    {scanMode === 'TEXT' ? (
+                        <>
+                            <textarea 
+                                value={scanInputText}
+                                onChange={(e) => setScanInputText(e.target.value)}
+                                placeholder="> PASTE TARGET URL OR RAW INTEL HERE..."
+                                className="w-full h-40 bg-black border border-gray-800 p-4 text-green-400 font-mono text-xs rounded-lg focus:border-purple-500 outline-none resize-none leading-relaxed shadow-inner"
+                            />
+                            <div className="absolute bottom-4 right-4 flex gap-2">
+                                <button onClick={() => setScanInputText('')} className="text-[10px] text-gray-500 hover:text-red-500 uppercase font-bold bg-black/80 px-2 py-1 rounded border border-gray-800">Clear</button>
+                                <button onClick={handlePaste} className="text-[10px] text-purple-400 hover:text-white uppercase font-bold bg-purple-900/20 px-3 py-1 rounded border border-purple-500/30 flex items-center gap-1 hover:bg-purple-900/40"><Clipboard size={12}/> Paste</button>
+                            </div>
+                        </>
                     ) : (
-                        <div className="border-2 border-dashed border-gray-700 rounded h-32 flex flex-col items-center justify-center bg-black/50 hover:border-purple-500 transition-colors relative group">
+                        <div className="border-2 border-dashed border-gray-800 rounded-lg h-40 flex flex-col items-center justify-center bg-black/50 hover:border-purple-500 transition-all relative group cursor-pointer overflow-hidden">
+                            <div className="absolute inset-0 bg-purple-900/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             {scanFileBase64 ? (
-                                <div className="text-center p-4">
-                                    {scanFileType.includes('image') ? <div className="relative h-20 w-full mb-2"><img src={scanFileBase64} alt="Preview" className="h-full w-full object-contain opacity-70" /></div> : <FileType size={48} className="mx-auto text-purple-400 mb-2" />}
-                                    <p className="text-xs font-bold text-white">{scanFileName}</p>
+                                <div className="text-center p-4 relative z-10">
+                                    {scanFileType.includes('image') ? (
+                                        <div className="h-24 w-full flex justify-center mb-2"><img src={scanFileBase64} alt="Preview" className="h-full object-contain rounded border border-gray-700 shadow-lg" /></div>
+                                    ) : (
+                                        <FileType size={48} className="mx-auto text-purple-400 mb-2 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
+                                    )}
+                                    <p className="text-xs font-bold text-white font-mono">{scanFileName}</p>
+                                    <button onClick={(e) => {e.stopPropagation(); resetScanner();}} className="mt-2 text-[10px] text-red-500 hover:text-red-400 underline">Remove File</button>
                                 </div>
                             ) : (
-                                <div className="text-center pointer-events-none"><Upload className="mx-auto text-gray-500 mb-2" /><p className="text-xs text-gray-500">Drop File</p></div>
+                                <div className="text-center pointer-events-none relative z-10">
+                                    <Upload className="mx-auto text-gray-600 mb-3 group-hover:text-purple-400 transition-colors" size={32} />
+                                    <p className="text-xs text-gray-400 font-bold uppercase">Drop Secure File Here</p>
+                                    <p className="text-[10px] text-gray-600 font-mono mt-1">PDF • IMG • TXT • AUDIO</p>
+                                </div>
                             )}
                             <input type="file" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
                         </div>
                     )}
                     
-                    {/* SCANNING OVERLAY */}
+                    {/* SCANNING TERMINAL OVERLAY */}
                     {isScanning && (
-                        <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center rounded z-10 border border-purple-500/20">
-                            <Loader className="animate-spin text-purple-500 mb-2" size={32} />
-                            <p className="text-purple-400 font-mono font-bold text-xs uppercase animate-pulse">{scanStage}</p>
-                            <p className="text-[10px] text-gray-500 mt-2 font-mono">DO NOT CLOSE WINDOW</p>
+                        <div className="absolute inset-0 bg-black/95 rounded-lg z-20 border border-purple-500 flex flex-col p-6 font-mono shadow-2xl">
+                            <div className="flex items-center gap-2 mb-4 border-b border-purple-900/50 pb-2">
+                                <Loader className="animate-spin text-purple-500" size={16} />
+                                <span className="text-purple-500 font-bold text-xs uppercase animate-pulse">System Processing...</span>
+                            </div>
+                            <div className="flex-1 overflow-hidden flex flex-col justify-end space-y-1">
+                                {terminalLogs.map((log, i) => (
+                                    <p key={i} className="text-[10px] text-green-500/80 font-bold">
+                                        <span className="text-gray-600 mr-2">[{new Date().toLocaleTimeString()}]</span>
+                                        {log}
+                                    </p>
+                                ))}
+                                <p className="text-xs text-green-400 font-bold animate-pulse mt-2">> {scanStage}</p>
+                            </div>
                         </div>
                     )}
                 </div>
 
-                <div className="flex flex-col gap-2 justify-end">
-                    <button 
-                        onClick={executeNeuralScan}
-                        disabled={isScanning}
-                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded uppercase text-xs tracking-wider transition-colors disabled:opacity-50 flex items-center justify-center gap-2 h-12 w-full md:w-auto shadow-lg shadow-purple-900/50"
-                    >
-                        {isScanning ? <Brain className="animate-spin"/> : <Zap size={16}/>}
-                        {isScanning ? "HUNTING DATA..." : "DEEP SCAN"}
-                    </button>
-                    {scanMode === 'FILE' && scanFileName && <button onClick={resetScanner} className="text-[10px] text-gray-500 hover:text-red-500 uppercase font-bold">Clear File</button>}
-                </div>
-            </div>
+                {/* 3. EXECUTE BUTTON */}
+                <button 
+                    onClick={executeNeuralScan}
+                    disabled={isScanning || (!scanInputText && !scanFileBase64)}
+                    className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-lg uppercase text-sm tracking-[0.2em] transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] flex items-center justify-center gap-3 border border-purple-400/20"
+                >
+                    {isScanning ? <Cpu className="animate-spin"/> : <Zap size={20} className="text-yellow-300 fill-yellow-300"/>}
+                    {isScanning ? "NEURAL BRIDGE ACTIVE..." : "INITIATE DEEP SCAN"}
+                </button>
 
-            {/* Scan Results (Buffer) */}
-            {scannedNotes.length > 0 && (
-                <div className="mt-6 bg-black/80 border border-purple-500/30 p-4 rounded-lg animate-in slide-in-from-top-4">
-                    <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle className="text-green-500" size={16}/>
-                            <h4 className="text-sm font-bold text-purple-400 uppercase">Extraction Complete</h4>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={createBookFromScan} className="text-xs bg-wealth-green text-black px-4 py-2 rounded font-bold uppercase hover:bg-emerald-400 flex items-center gap-1"><Save size={14}/> Create New Entry</button>
-                            <button onClick={resetScanner} className="text-gray-500 hover:text-white"><X size={14}/></button>
-                        </div>
-                    </div>
-
-                    <div className="mb-6 space-y-4">
-                        <div>
-                            <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Entry Title (Editable)</label>
+                {/* 4. RESULTS BUFFER */}
+                {scannedNotes.length > 0 && (
+                    <div className="mt-8 border-t-2 border-purple-900/50 pt-6 animate-in slide-in-from-top-4">
+                        <div className="flex justify-between items-center mb-6">
                             <div className="flex items-center gap-2">
-                                <input value={scanResultTitle} onChange={(e) => setScanResultTitle(e.target.value)} className="flex-1 bg-slate-900 border border-purple-500/50 p-2 text-white font-bold rounded focus:border-purple-500 outline-none" />
-                                <Pencil size={14} className="text-gray-500" />
+                                <CheckCircle className="text-green-500" size={20}/>
+                                <div>
+                                    <h4 className="text-lg font-black text-white uppercase tracking-tighter">Mission Report</h4>
+                                    <p className="text-[10px] text-green-500 font-mono">INTELLIGENCE ACQUIRED</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={handleExportToExcel} className="text-xs bg-blue-600 text-white px-3 py-2 rounded font-bold uppercase hover:bg-blue-500 flex items-center gap-2 shadow-lg shadow-blue-900/20"><FileSpreadsheet size={14}/> Export Data</button>
+                                <button onClick={createBookFromScan} className="text-xs bg-wealth-green text-black px-4 py-2 rounded font-bold uppercase hover:bg-emerald-400 flex items-center gap-2 shadow-lg shadow-green-900/20"><Save size={14}/> Save to Archive</button>
+                                <button onClick={resetScanner} className="text-xs bg-gray-800 text-gray-400 px-3 py-2 rounded font-bold uppercase hover:text-white flex items-center gap-1"><Trash2 size={14}/> Discard</button>
                             </div>
                         </div>
-                        {/* Executive Brief Editor */}
-                        {(scanSummary || isEditingSummary) && (
-                            <div className="bg-purple-900/10 border border-purple-900/50 rounded-lg relative overflow-hidden flex flex-col max-h-96 group">
-                                <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none"><Brain size={48} className="text-purple-500"/></div>
-                                <div className="flex items-center justify-between p-4 border-b border-purple-900/30 bg-purple-900/20">
-                                    <div className="flex items-center gap-2">
-                                        <Brain size={16} className="text-purple-400" />
-                                        <h4 className="text-xs font-bold text-purple-200 uppercase">Executive Brief (SITREP)</h4>
-                                    </div>
-                                    <button onClick={() => {
-                                        if (isEditingSummary) setScanSummary(tempSummary);
-                                        else setTempSummary(scanSummary);
-                                        setIsEditingSummary(!isEditingSummary);
-                                    }} className="text-xs text-purple-400 hover:text-white uppercase font-bold">
-                                        {isEditingSummary ? 'Save Brief' : 'Edit Brief'}
-                                    </button>
+
+                        <div className="space-y-6">
+                            {/* TITLE & BRIEF */}
+                            <div className="bg-purple-900/10 border border-purple-500/30 rounded-lg overflow-hidden">
+                                <div className="p-3 bg-purple-900/20 border-b border-purple-500/20 flex justify-between items-center">
+                                    <input value={scanResultTitle} onChange={(e) => setScanResultTitle(e.target.value)} className="bg-transparent text-purple-200 font-bold text-sm w-full outline-none placeholder-purple-700" placeholder="ENTER REPORT TITLE..." />
+                                    <Edit2 size={12} className="text-purple-500"/>
                                 </div>
-                                <div className="p-4 overflow-y-auto custom-scrollbar">
+                                <div className="p-4 relative group">
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => {
+                                            if (isEditingSummary) setScanSummary(tempSummary);
+                                            else setTempSummary(scanSummary);
+                                            setIsEditingSummary(!isEditingSummary);
+                                        }} className="text-[10px] text-purple-400 uppercase font-bold border border-purple-500/30 px-2 py-1 rounded hover:bg-purple-500 hover:text-white">
+                                            {isEditingSummary ? 'Save Brief' : 'Edit Brief'}
+                                        </button>
+                                    </div>
                                     {isEditingSummary ? (
                                         <textarea 
                                             value={tempSummary}
                                             onChange={(e) => setTempSummary(e.target.value)}
-                                            className="w-full h-40 bg-black/50 border border-purple-500/50 text-white p-2 rounded text-sm font-mono outline-none"
+                                            className="w-full h-40 bg-black/50 border border-purple-500/30 text-gray-300 p-3 rounded text-xs font-mono outline-none leading-relaxed"
                                         />
                                     ) : (
-                                        <p className="text-sm text-gray-300 italic leading-relaxed whitespace-pre-line">"{scanSummary}"</p>
+                                        <p className="text-xs text-gray-300 font-mono leading-relaxed whitespace-pre-line border-l-2 border-purple-500 pl-3">
+                                            {scanSummary || "No executive brief generated."}
+                                        </p>
                                     )}
                                 </div>
                             </div>
-                        )}
-                    </div>
 
-                    {/* EXCEL-LIKE DATA GRID (EDITABLE) */}
-                    <div className="flex justify-between items-center mb-2 px-2">
-                        <div className="flex items-center gap-2">
-                            <FileSpreadsheet size={16} className="text-green-500"/>
-                            <span className="text-xs text-gray-400 uppercase font-bold">Data Matrix View (Editable)</span>
-                        </div>
-                        <button onClick={addManualScannedNote} className="text-[10px] bg-blue-600/20 text-blue-400 border border-blue-600 px-2 py-1 rounded font-bold uppercase hover:bg-blue-600 hover:text-white transition-all">+ Add Row</button>
-                    </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-700">
-                        <table className="w-full text-left border-collapse text-xs">
-                            <thead className="bg-slate-900 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-600">
-                                <tr>
-                                    <th className="p-3 border-r border-gray-700 w-[23%]"><Table size={14} className="inline mr-1 mb-0.5"/> Concept</th>
-                                    <th className="p-3 border-r border-gray-700 w-[23%]"><AlertTriangle size={14} className="inline mr-1 mb-0.5 text-red-500"/> Problem</th>
-                                    <th className="p-3 border-r border-gray-700 w-[23%] bg-green-900/20 text-green-400"><Crosshair size={14} className="inline mr-1 mb-0.5"/> Action</th>
-                                    <th className="p-3 border-r border-gray-700 w-[23%]"><Lightbulb size={14} className="inline mr-1 mb-0.5 text-yellow-500"/> Example</th>
-                                    <th className="p-3 w-[8%] text-center">Cmd</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-black/50 text-gray-300 font-mono">
-                                {scannedNotes.map((note, idx) => (
-                                    <tr key={note.id || idx} className={`border-b border-gray-800 last:border-0 ${scannerEditingId === note.id ? 'bg-blue-900/10' : 'hover:bg-slate-900/50'}`}>
-                                        {scannerEditingId === note.id ? (
-                                            <>
-                                                <td className="p-2 border-r border-gray-700 align-top">
-                                                    <textarea value={scannerEditContent?.concept} onChange={e => setScannerEditContent(prev => prev ? {...prev, concept: e.target.value} : null)} className="w-full bg-slate-950 border border-blue-500 rounded p-1 text-white text-xs h-20 outline-none resize-none" />
+                            {/* DATA MATRIX */}
+                            <div className="overflow-hidden rounded-lg border border-gray-800">
+                                <div className="bg-gray-900 p-2 flex justify-between items-center border-b border-gray-800">
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Table size={12}/> Data Matrix</span>
+                                    <button onClick={addManualScannedNote} className="text-[10px] text-blue-400 hover:text-white font-bold uppercase">+ Add Vector</button>
+                                </div>
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-black text-gray-500 font-bold uppercase tracking-wider">
+                                        <tr>
+                                            <th className="p-3 border-r border-gray-800 w-[5%] text-center">#</th>
+                                            <th className="p-3 border-r border-gray-800 w-[20%]">Key Point / Concept</th>
+                                            <th className="p-3 border-r border-gray-800 w-[25%] text-red-400">Root Problem (Why?)</th>
+                                            <th className="p-3 border-r border-gray-800 w-[25%] text-green-500">Action (Do This)</th>
+                                            <th className="p-3 w-[25%] text-yellow-600">Evidence / Context</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-slate-900/30 divide-y divide-gray-800 text-gray-300 font-mono">
+                                        {scannedNotes.map((note, idx) => (
+                                            <tr key={note.id || idx} className="hover:bg-purple-900/10 transition-colors group">
+                                                <td className="p-3 text-center text-gray-600 border-r border-gray-800">{idx + 1}</td>
+                                                <td className="p-3 border-r border-gray-800 align-top relative">
+                                                    {scannerEditingId === note.id ? (
+                                                        <textarea value={scannerEditContent?.concept} onChange={e => setScannerEditContent(prev => prev ? {...prev, concept: e.target.value} : null)} className="w-full h-20 bg-black border border-blue-500 p-1 rounded text-white text-xs outline-none" />
+                                                    ) : (
+                                                        <>
+                                                            <div className="whitespace-pre-wrap leading-relaxed text-gray-200 font-medium">{note.concept}</div>
+                                                            <button onClick={() => startEditingScannedNote(note)} className="absolute top-2 right-2 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={10}/></button>
+                                                        </>
+                                                    )}
                                                 </td>
-                                                <td className="p-2 border-r border-gray-700 align-top">
-                                                    <textarea value={scannerEditContent?.problem} onChange={e => setScannerEditContent(prev => prev ? {...prev, problem: e.target.value} : null)} className="w-full bg-slate-950 border border-red-500 rounded p-1 text-white text-xs h-20 outline-none resize-none" />
+                                                <td className="p-3 border-r border-gray-800 align-top text-red-300/90 bg-red-950/10">
+                                                    {scannerEditingId === note.id ? (
+                                                        <textarea value={scannerEditContent?.problem} onChange={e => setScannerEditContent(prev => prev ? {...prev, problem: e.target.value} : null)} className="w-full h-20 bg-black border border-red-500 p-1 rounded text-white text-xs outline-none" />
+                                                    ) : (
+                                                        <div className="whitespace-pre-wrap leading-relaxed">{note.problem || "-"}</div>
+                                                    )}
                                                 </td>
-                                                <td className="p-2 border-r border-gray-700 align-top">
-                                                    <textarea value={scannerEditContent?.action} onChange={e => setScannerEditContent(prev => prev ? {...prev, action: e.target.value} : null)} className="w-full bg-slate-950 border border-green-500 rounded p-1 text-white text-xs h-20 outline-none resize-none" />
+                                                <td className="p-3 border-r border-gray-800 align-top text-green-400 font-bold bg-green-950/10">
+                                                    {scannerEditingId === note.id ? (
+                                                        <textarea value={scannerEditContent?.action} onChange={e => setScannerEditContent(prev => prev ? {...prev, action: e.target.value} : null)} className="w-full h-20 bg-black border border-green-500 p-1 rounded text-white text-xs outline-none" />
+                                                    ) : (
+                                                        <div className="whitespace-pre-wrap leading-relaxed">{note.action}</div>
+                                                    )}
                                                 </td>
-                                                <td className="p-2 border-r border-gray-700 align-top">
-                                                    <textarea value={scannerEditContent?.example} onChange={e => setScannerEditContent(prev => prev ? {...prev, example: e.target.value} : null)} className="w-full bg-slate-950 border border-yellow-500 rounded p-1 text-white text-xs h-20 outline-none resize-none" />
+                                                <td className="p-3 align-top text-yellow-200/70 italic relative bg-yellow-950/5">
+                                                    {scannerEditingId === note.id ? (
+                                                        <>
+                                                            <textarea value={scannerEditContent?.example} onChange={e => setScannerEditContent(prev => prev ? {...prev, example: e.target.value} : null)} className="w-full h-20 bg-black border border-yellow-500 p-1 rounded text-white text-xs outline-none mb-2" />
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button onClick={saveScannedNoteEdit} className="bg-green-600 text-white px-2 py-1 rounded text-[10px] uppercase font-bold">Save</button>
+                                                                <button onClick={() => setScannerEditingId(null)} className="bg-red-600 text-white px-2 py-1 rounded text-[10px] uppercase font-bold">Cancel</button>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className="whitespace-pre-wrap leading-relaxed">{note.example || "-"}</div>
+                                                    )}
                                                 </td>
-                                                <td className="p-2 align-middle text-center">
-                                                    <div className="flex flex-col gap-2">
-                                                        <button onClick={saveScannedNoteEdit} className="text-green-500 hover:text-white bg-green-900/20 p-1.5 rounded"><Save size={14}/></button>
-                                                        <button onClick={() => setScannerEditingId(null)} className="text-red-500 hover:text-white bg-red-900/20 p-1.5 rounded"><X size={14}/></button>
-                                                    </div>
-                                                </td>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <td className="p-3 border-r border-gray-700 align-top whitespace-pre-line leading-relaxed border-l-4 border-l-purple-500/0 hover:border-l-purple-500 transition-all">
-                                                    {note.concept}
-                                                </td>
-                                                <td className="p-3 border-r border-gray-700 align-top text-red-300 whitespace-pre-line leading-relaxed bg-red-950/10">
-                                                    {note.problem || "-"}
-                                                </td>
-                                                <td className="p-3 border-r border-gray-700 align-top bg-green-900/10 text-green-300 font-bold whitespace-pre-line leading-relaxed">
-                                                    {note.action}
-                                                </td>
-                                                <td className="p-3 border-r border-gray-700 align-top text-yellow-200/80 italic whitespace-pre-line leading-relaxed bg-yellow-900/5">
-                                                    {note.example || "-"}
-                                                </td>
-                                                <td className="p-2 align-top text-center">
-                                                    <div className="flex flex-col gap-2 opacity-0 hover:opacity-100 transition-opacity">
-                                                        <button onClick={() => startEditingScannedNote(note)} className="text-blue-500 hover:text-blue-300 bg-blue-900/20 p-1.5 rounded w-full flex justify-center"><Edit2 size={12}/></button>
-                                                    </div>
-                                                </td>
-                                            </>
-                                        )}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t border-gray-700">
-                        <p className="text-xs text-gray-500 mb-2 font-bold uppercase">Or append to existing topic:</p>
-                        <div className="flex gap-2 overflow-x-auto pb-2">
-                            {books.slice(0, 5).map(b => (
-                                <button key={b.id} onClick={() => saveScannedNotesToBook(b.id)} className="bg-gray-800 text-gray-300 text-[10px] px-3 py-2 rounded border border-gray-700 hover:border-purple-500 hover:text-white whitespace-nowrap transition-colors">
-                                    {b.title.substring(0, 20)}...
-                                </button>
-                            ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* QUICK APPEND */}
+                            <div className="pt-4 border-t border-gray-800">
+                                <p className="text-[10px] text-gray-500 mb-2 font-bold uppercase">Quick Append To Library:</p>
+                                <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                                    {books.slice(0, 5).map(b => (
+                                        <button key={b.id} onClick={() => saveScannedNotesToBook(b.id)} className="bg-gray-900 text-gray-400 text-[10px] px-3 py-2 rounded border border-gray-800 hover:border-purple-500 hover:text-white whitespace-nowrap transition-colors flex items-center gap-1">
+                                            <Book size={10}/> {b.title.substring(0, 20)}...
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
 
         {/* --- LIBRARY SECTION --- */}

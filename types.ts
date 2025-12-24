@@ -1,8 +1,15 @@
 
 export interface FinancialState {
-  bankA: number; // Income Hub
-  bankB: number; // Wealth/Freedom (Investments)
-  bankC: number; // Survival (Needs + Wants)
+  // 3-Account Architecture
+  bankA: number; // The Hub (Primary / Liquid Shield - Sweep-in FD)
+  bankB: number; // The Wealth Lab (Investments)
+  bankC: number; // The Operations (Expenses / Bills)
+  
+  // Account 2: The Wealth Lab Layers
+  layerCore: number; // Index/SIP - Foundation
+  layerAccelerator: number; // High Growth - Multiplier
+  layerOpportunity: number; // Dry Powder - Crash Hunter
+  
   monthlyIncome: number;
   transactions: Transaction[];
   assets: Asset[];
@@ -11,7 +18,18 @@ export interface FinancialState {
   legacyProjects: LegacyProject[];
   budgetSnapshots: MonthlyBudgetSnapshot[];
   mindsetLogs: MoneyMindsetLog[];
-  roadmapSettings?: RoadmapSettings; // NEW: For the 5-Step Plan
+  roadmapSettings?: RoadmapSettings;
+  
+  // Engine Controls
+  engineSettings: {
+    wealthTaxRate: number; // 10-30%
+    fixedEmiAllocation: number; // Fixed amount for bills (Step 1)
+    isSweepInEnabled: boolean; // Sweep-in FD toggle
+    dividendFlywheelActive: boolean; // Auto-reinvest dividends
+    inflationAdjustment: boolean;
+    noLifestyleCreep: boolean;
+    crashModeActive: boolean;
+  };
 }
 
 export interface RoadmapSettings {
@@ -24,16 +42,16 @@ export interface RoadmapSettings {
 export interface MoneyMindsetLog {
   id: string;
   date: string;
-  patternProblem: string; // "Impulse Buy", "Fear", "Showoff"
-  identifyTrigger: string; // "Saw friend buy it", "Felt sad"
-  solveAction: string; // "Waited 24h", "Invested instead"
-  guiltFreeSpent: number; // Amount spent on self-care
+  patternProblem: string;
+  identifyTrigger: string;
+  solveAction: string;
+  guiltFreeSpent: number;
   notes: string;
 }
 
 export interface MonthlyBudgetSnapshot {
   id: string;
-  month: string; // YYYY-MM
+  month: string;
   income: number;
   dependents: number;
   essentialExpenses: number;
@@ -45,10 +63,10 @@ export interface BusinessEntity {
   id: string;
   name: string;
   type: 'Service' | 'Product' | 'Passive';
-  stage: 1 | 2 | 3 | 4 | 5; // 1=Start, 5=Brand
+  stage: 1 | 2 | 3 | 4 | 5;
   monthlyRevenue: number;
   valuation: number;
-  growthRate: number; // Percentage
+  growthRate: number;
 }
 
 export interface LoanLiability {
@@ -64,7 +82,7 @@ export interface LegacyProject {
   id: string;
   name: string;
   budget: number;
-  impactScore: number; // 0-100
+  impactScore: number;
   status: 'Idea' | 'Planning' | 'Active' | 'Completed';
 }
 
@@ -72,9 +90,9 @@ export interface Transaction {
   id: string;
   amount: number;
   description: string;
-  category: 'Needs' | 'Wants' | 'Investment' | 'Income' | 'Debt';
-  subcategory?: string; // e.g., "Food", "Rent", "Salary"
-  paymentMethod?: string; // "Cash", "Card", "Bank Transfer"
+  category: 'Needs' | 'Wants' | 'Investment' | 'Income' | 'Debt' | 'Dividend';
+  subcategory?: string;
+  paymentMethod?: string;
   date: string;
   bank: 'A' | 'B' | 'C';
 }
@@ -84,89 +102,18 @@ export interface Asset {
   name: string;
   value: number;
   type: 'Sanchaypatra' | 'FDR' | 'Stock' | 'Land' | 'Business' | 'Gold';
-  roi: number; // Percentage
+  roi: number;
+  isTaxEfficient?: boolean;
 }
 
 export interface Habit {
   id: string;
   name: string;
   streak: number;
-  lastCompleted: string | null; // Date string YYYY-MM-DD
-  history: string[]; // Array of Date strings YYYY-MM-DD
-  reminderTime?: string; // HH:MM format
+  lastCompleted: string | null;
+  history: string[];
+  reminderTime?: string;
   category: 'Health' | 'Mindset' | 'Skill';
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  deadline: string;
-  category: 'Exam' | 'Skill' | 'Project';
-  status: 'Pending' | 'Done' | 'Failed';
-  progress?: number; // Added for detailed tracking
-  notes?: string; // Added for detailed tracking
-  urgent: boolean;
-}
-
-// NEW: For Strategic Objectives & Daily Journal
-export interface JournalTask {
-    id: string;
-    category: string;
-    task: string;
-    status: string; // Not Started, In Progress, Done
-    priority: string;
-    progress: number;
-    notes: string;
-    dueDate?: string;
-}
-
-export interface DailyAction {
-    id: string;
-    category: string;
-    task: string;
-    status: string; // Not Started, In Progress, Done
-    priority: string;
-    progress: number;
-    notes: string;
-    isCompleted?: boolean; // Legacy support
-}
-
-export interface ChecklistState {
-  morning: Record<string, boolean>;
-  daytime: Record<string, boolean>;
-  mindset: Record<string, boolean>;
-  finance: Record<string, boolean>;
-}
-
-// NEW: Advanced Learning Point Structure
-export interface NeuralNote {
-  id: string;
-  concept: string; // The "What"
-  action: string;  // The "Do This" (Real Life Action)
-  problem?: string; // The "Why/Pain" (Real Life Problem)
-  example?: string; // Legacy support or extra context
-  iconCategory: 'MONEY' | 'MIND' | 'POWER' | 'HEALTH' | 'SKILL'; 
-  sourceType: 'TEXT' | 'YOUTUBE' | 'IMAGE' | 'BOOK';
-  timestamp: string;
-}
-
-export interface CodexChapter {
-  id: string;
-  title: string;
-  description: string;
-  content: {
-    sectionTitle: string;
-    points: string[];
-  }[];
-}
-
-export interface Book {
-  id: string;
-  title: string;
-  author: string;
-  status: 'Reading' | 'Completed' | 'To Read';
-  neuralNotes: NeuralNote[]; // Replaced simple 'learnings' array
-  rating: number; // 1-5
 }
 
 export interface UserProfile {
@@ -174,7 +121,7 @@ export interface UserProfile {
   age: number;
   targetRetirementAge: number;
   missionStatement: string;
-  xp: number; // Gamification
+  xp: number;
   level: number;
   rank: string;
 }
@@ -203,9 +150,67 @@ export interface SpartanDayPlan {
   cardio: string;
 }
 
+export interface NeuralNote {
+  id: string;
+  concept: string;
+  action: string;
+  problem?: string;
+  example?: string;
+  iconCategory: 'MIND' | 'MONEY' | 'POWER' | 'HEALTH' | 'SKILL';
+  sourceType: 'BOOK' | 'YOUTUBE' | 'TEXT' | 'IMAGE';
+  timestamp: string;
+}
+
+export interface Book {
+  id: string;
+  title: string;
+  author: string;
+  status: 'All' | 'Reading' | 'To Read' | 'Completed' | string;
+  neuralNotes: NeuralNote[];
+  rating: number;
+}
+
+export interface CodexChapter {
+  id: string;
+  title: string;
+  description: string;
+  content: {
+    sectionTitle: string;
+    points: string[];
+  }[];
+}
+
+export interface JournalTask {
+  id: string;
+  category: string;
+  task: string;
+  status: 'Not Started' | 'In Progress' | 'Completed' | 'Done' | 'Pending' | 'URGENT' | string;
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  progress: number;
+  notes: string;
+  dueDate?: string;
+}
+
+export interface DailyAction {
+  id: string;
+  task: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  status: 'Not Started' | 'Completed';
+  notes: string;
+  progress: number;
+  category: string;
+}
+
+export interface ChecklistState {
+  morning: Record<string, boolean>;
+  daytime: Record<string, boolean>;
+  mindset: Record<string, boolean>;
+  finance: Record<string, boolean>;
+}
+
 export enum AppSection {
   DASHBOARD = 'DASHBOARD',
-  WAR_ROOM = 'WAR_ROOM', // New
+  WAR_ROOM = 'WAR_ROOM',
   WEALTH = 'WEALTH',
   KNOWLEDGE = 'KNOWLEDGE',
   SPARTAN = 'SPARTAN',

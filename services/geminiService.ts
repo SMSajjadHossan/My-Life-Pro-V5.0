@@ -10,6 +10,7 @@ const getAI = () => {
     console.warn("API_KEY is missing. Please set it in Environment Variables.");
     return null;
   }
+  // Initialize according to @google/genai guidelines
   return new GoogleGenAI({ apiKey: apiKey });
 };
 
@@ -51,10 +52,10 @@ export const validatePurchase = async (item: string, price: number, hourlyRate: 
 
   **APPLY THE 'PURCHASE COURT' ALGORITHM (RUTHLESSLY):**
   
-  1. **Liability Check:** Is this a Liability? (Does it put money in pocket or take it out?)
-  2. **The 10x Rule:** Can the user afford to buy 10 of these? (${price * 10} BDT). If NO, REJECT immediately.
-  3. **The Luxury Rule:** If this is a 'Want'/'Luxury', has the user invested 2x this amount (${price * 2} BDT) in assets first?
-  4. **Life Cost:** Calculate cost in 'Hours of Life' (Price / Hourly Rate).
+  1.  **Liability Check:** Is this a Liability? (Does it put money in pocket or take it out?)
+  2.  **The 10x Rule:** Can the user afford to buy 10 of these? (${price * 10} BDT). If NO, REJECT immediately.
+  3.  **The Luxury Rule:** If this is a 'Want'/'Luxury', has the user invested 2x this amount (${price * 2} BDT) in assets first?
+  4.  **Life Cost:** Calculate cost in 'Hours of Life' (Price / Hourly Rate).
 
   **OUTPUT FORMAT:**
   - **Verdict:** [PASS / FAIL / CRITICAL FAIL]
@@ -63,13 +64,15 @@ export const validatePurchase = async (item: string, price: number, hourlyRate: 
   `;
 
   try {
+    // Correct usage of generateContent with gemini-3-flash-preview
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
       }
     });
+    // Access response.text property directly
     return response.text;
   } catch (error) {
     console.error("AI Error", error);
@@ -101,7 +104,7 @@ export const validateBusinessIdea = async (idea: string) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -121,7 +124,7 @@ export const getStoicAdvice = async (context: string) => {
   
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `User Context: ${context}. Give me a stoic directive based on the "Dominance" architecture.`,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -156,45 +159,50 @@ export const processNeuralInput = async (textInput: string, mediaBase64: string 
   const ai = getAI();
   if (!ai) return JSON.stringify({ notes: [{ concept: "API Offline", action: "Check connection", iconCategory: "MIND" }] });
 
-  // REINFORCED PROMPT FOR "SUPER EXPERT" ACCURACY & TRANSCRIPT HUNTING
+  // REINFORCED PROMPT FOR "SUPER EXPERT" ACCURACY & EXCEL-LIKE EXTRACTION
   const prompt = `
-  **PROTOCOL:** FORENSIC DEEP SCAN (ULTRA ACCURACY MODE).
-  **ROLE:** Elite Content Analyst & Linguist.
+  **PROTOCOL:** FORENSIC DEEP SCAN (FULL SPECTRAL ANALYSIS).
+  **ROLE:** Elite Analyst & Linguist (English + Native Bengali).
   **INPUT DATA:** "${textInput || 'Attached File'}"
   **CONTEXT:** "${context || 'General Analysis'}"
 
-  **EXECUTION STEPS (STRICT ORDER):**
-  
-  1.  **IDENTIFY & SEARCH (THE MOST IMPORTANT STEP):**
-      - If the input is a **URL (YouTube, Spotify, Article)**: You MUST use Google Search to find the **FULL TRANSCRIPT**, **LYRICS**, or **SCRIPT** first.
-      - **DO NOT** summarize based on the title alone.
-      - **DO NOT** hallucinate. If you cannot find the exact text, search for "Summary of [Title]" or "Analysis of [URL]" to get the most detailed breakdown possible.
-      - *Verification:* In your internal thought process, quote the first and last lines of the content to ensure you have the full picture.
+  **MISSION OBJECTIVE:** 
+  Conduct a forensic extraction of the content. 
+  **CRITICAL:** The user wants the output to match the source material EXACTLY ("Je kotha video te bolse ta same pabo"). 
+  Do not hallucinate. Do not over-simplify if the source is complex. Capture every nuance.
 
-  2.  **DEEP ANALYSIS (COVER EVERYTHING):**
-      - Do not miss anything.
-      - If it is a video, cover the *entire* duration (Start, Middle, End).
-      - If it is a song, analyze the *hidden meaning* behind the lyrics.
-      - Extract every specific rule, habit, or strategy mentioned.
+  **EXECUTION STEPS:**
+  1.  **IF URL (e.g. YouTube):** Use Google Search to find the transcript, summary, or key points of the video/article. If you cannot access it, search for the video title + "summary" or "transcript".
+  2.  **TRANSCRIPTION MATCHING:** Ensure the 'Concept' captures the exact message of the speaker/author. Use their words.
+  3.  **FULL EXTRACTION:** If there are 10 points, extract 10. If 50, extract 50. No truncation.
+  4.  **ROOT CAUSE ANALYSIS:** For every point, deduce the "Real-Life Problem" it solves.
+  5.  **BILINGUAL OUTPUT:** English + Native Bengali (Colloquial/Natural - "Jemon ashe temon").
 
-  3.  **TRANSLATE & FORMAT (BILINGUAL):**
-      - Output strictly in English followed by Bangla (Jemon Ashe Temon - Soulful Translation).
-      - The Bangla should sound native, powerful, and commanding.
+  **ERROR HANDLING (CRITICAL):**
+  If you absolutely cannot access the content (e.g., video has no digital footprint), you **MUST** still return valid JSON. 
+  Put your explanation (e.g., "I cannot watch this video directly...") inside the 'summary' field. 
+  Do NOT return plain text. Do NOT apologize in plain text.
+
+  **OUTPUT FORMAT (EXCEL-LIKE DATA MATRIX):**
+  For each extracted point:
+  1. **Concept:** The core message (Verbatim/Close to source).
+  2. **Problem:** Why does this matter? What pain does it cure?
+  3. **Action:** A specific, physical micro-action to take immediately.
+  4. **Example:** The exact story, data, or quote used as proof in the source.
 
   **JSON OUTPUT STRUCTURE (STRICT):**
-  You must output ONLY valid JSON.
+  Output ONLY valid JSON.
   {
-    "title": "Exact Title of Content (English)\\n(বাংলা শিরোনাম)",
-    "summary": "DETAILED EXECUTIVE BRIEF: A comprehensive summary covering the WHOLE content from start to finish. Don't be brief, be thorough. (English)\\n(বিস্তারিত সারসংক্ষেপ: শুরু থেকে শেষ পর্যন্ত সম্পূর্ণ বিষয়বস্তু - বাংলা)",
+    "title": "Title (English) | (বাংলা)",
+    "summary": "EXECUTIVE BRIEF: High-level summary covering the beginning, middle, and end. (English)\\n\\n(সারাংশ: ... বাংলা)",
     "notes": [
       {
-        "concept": "[The Rule/Core Idea] English...\\n[মূল নিয়ম] বাংলা...",
-        "problem": "[The Pain/Context] Why does this matter? What problem does it solve? English...\\n[সমস্যা/প্রেক্ষাপট] বাংলা...",
-        "action": "[The Protocol] Specific, Physical Action Step. English...\\n[করণীয় কাজ] বাংলা...",
-        "example": "[Evidence] A direct quote, timestamp reference, or case study from the content. English...\\n[প্রমাণ/উদ্ধৃতি] বাংলা...",
+        "concept": "**CORE CONCEPT:** English Text\\n**(মূল কথা):** বাংলা টেক্সট (হুবহু)",
+        "problem": "**PROBLEM:** Pain Point\\n**(সমস্যা):** ...",
+        "action": "**ACTION:** Next Step\\n**(করণীয়):** ...",
+        "example": "**PROOF:** Quote/Story\\n**(উদাহরণ):** ...",
         "iconCategory": "MIND" // Options: MONEY, POWER, HEALTH, SKILL, MIND
-      },
-      ... (Create as many notes as needed to cover the WHOLE content. Do not limit to 3.)
+      }
     ]
   }
   `;
@@ -217,15 +225,28 @@ export const processNeuralInput = async (textInput: string, mediaBase64: string 
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: { parts },
       config: {
-        temperature: 0.2, // Low temp for factual accuracy
-        maxOutputTokens: 8192, // Max tokens for long summaries
+        temperature: 0.1, // Near zero for max fidelity (No creativity)
         tools: [{ googleSearch: {} }] // CRITICAL: ENABLED SEARCH
       }
     });
-    return response.text;
+    
+    let finalText = response.text || "{}";
+
+    // Extract grounding sources to comply with guidelines
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    if (chunks && chunks.length > 0) {
+        finalText += "\n\n**INTEL SOURCES:**\n";
+        chunks.forEach((chunk: any) => {
+            if (chunk.web) {
+                finalText += `- [${chunk.web.title}](${chunk.web.uri})\n`;
+            }
+        });
+    }
+
+    return finalText;
   } catch (error) {
     console.error("Neural Scan Error", error);
     return JSON.stringify({ 
@@ -246,6 +267,10 @@ export const analyzeBook = async (bookTitle: string) => {
         } else if (cleanJson.includes("```")) {
             cleanJson = cleanJson.replace(/```/g, "");
         }
+        // Extract JSON part in case grounding info was appended
+        const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
+        if (jsonMatch) cleanJson = jsonMatch[0];
+
         const parsed = JSON.parse(cleanJson);
         return JSON.stringify({ laws: parsed.notes.map((n:any) => n.concept) });
     } catch {
@@ -294,7 +319,7 @@ export const chatWithGeneral = async (message: string, appState: any) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,

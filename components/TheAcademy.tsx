@@ -1,50 +1,25 @@
 
-import React, { useState, useEffect } from 'react';
-import { BookOpen, Clock, ChevronRight, Target, Shield, Zap, Layout, List, CheckCircle, AlertTriangle, Lightbulb, Users, BarChart3, Heart, Activity, Plus, Trash2, Save, Minus, Edit3, X, GraduationCap, Briefcase, Globe, Cpu, Play, Pause, RotateCcw, Coffee, Timer, Brain, Calendar, PenTool, TrendingUp, AlertCircle } from 'lucide-react';
-import { STUDY_PHASES, GENIUS_LEARNING_RULES, CAREER_JOB_TIERS, REMOTE_JOB_STEPS } from '../constants';
-
-// --- STATIC DATA (CONSTANTS) ---
-
-const LIFE_MISSION = [
-  "Worship Allah • Achieve Financial Freedom • Maintain Health • Spread Knowledge",
-  "Honor Family • Travel the World • Work with Integrity • Keep Hope Alive"
-];
-
-const KAIZEN_PRINCIPLES = [
-  "Small Steps Matter", "Consistency Beats Intensity", "Everyone Can Contribute", "Eliminate Waste", "Reflect & Learn"
-];
-
-const LIFE_RULES = [
-  "Create! Don't just consume",
-  "Give purpose to your work",
-  "You are the farmer, body & mind is the horse 🐎",
-  "Think before you act",
-  "Read daily (10 pages)",
-  "Control emotions - Silence is power",
-  "Choose wise friends",
-  "Learn from mistakes (Yours & Others)",
-  "Manage money wisely (Save/Invest)",
-  "Stay disciplined - Do hard things"
-];
-
-const CRITICAL_THINKING_LEVELS = [
-  { level: 1, title: "Data is Everything", desc: "Trust facts, not feelings. If you can't measure it, you can't trust it." },
-  { level: 2, title: "Correlation ≠ Causation", desc: "Coincidence is not a cause. Check the root." },
-  { level: 3, title: "Syllogism Sanity", desc: "Check your foundational assumptions (A=B, B=C, so A=C)." },
-  { level: 4, title: "Prove Yourself Wrong", desc: "Be your own worst critic. Fight confirmation bias." },
-  { level: 5, title: "Second-Order Effects", desc: "Ask: 'And then what?' Look at the chain reaction." }
-];
-
-const BEZOS_STEPS = [
-  "Define Outcome", "Break into Inputs", "Automate Triggers", "Track Feedback", "Refine Slowly"
-];
+import React, { useState, useEffect, useMemo } from 'react';
+import { BookOpen, Clock, ChevronRight, Target, Shield, Zap, Layout, List, CheckCircle, AlertTriangle, Lightbulb, Users, BarChart3, Heart, Activity, Plus, Trash2, Save, Minus, Edit3, X, GraduationCap, Briefcase, Globe, Cpu, Play, Pause, RotateCcw, Coffee, Timer, Brain, Calendar, PenTool, TrendingUp, AlertCircle, Hourglass, Scan } from 'lucide-react';
+import { 
+  STUDY_PHASES, 
+  GENIUS_LEARNING_RULES, 
+  CAREER_JOB_TIERS, 
+  REMOTE_JOB_STEPS, 
+  KAIZEN_PRINCIPLES, 
+  BEZOS_STEPS, 
+  LIFE_MISSION, 
+  LIFE_RULES, 
+  CRITICAL_THINKING_LEVELS 
+} from '../constants';
 
 // --- TYPES FOR JOURNAL ---
 interface Exam {
     id: string;
     name: string;
-    date: string; // YYYY-MM-DD
-    startDate: string; // YYYY-MM-DD (Start of Prep)
+    date: string; // Target Date (YYYY-MM-DD)
+    startDate: string; // Start Date (YYYY-MM-DD)
+    validity?: number; // Years the score is valid for
 }
 
 interface StudyLog {
@@ -59,8 +34,15 @@ interface StudyLog {
     distraction: string; // What broke focus?
 }
 
+// Helper to get local date string YYYY-MM-DD
+const getLocalDate = () => {
+    const d = new Date();
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().split('T')[0];
+};
+
 export const TheAcademy: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STRATEGY' | 'SYSTEMS' | 'ACADEMICS' | 'JOURNAL' | 'CAREER' | 'WISDOM'>('ACADEMICS');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STRATEGY' | 'SYSTEMS' | 'ACADEMICS' | 'JOURNAL' | 'CAREER' | 'WISDOM'>('JOURNAL');
   
   // --- STATE MANAGEMENT WITH PERSISTENCE ---
 
@@ -128,14 +110,18 @@ export const TheAcademy: React.FC = () => {
   const [pomoMode, setPomoMode] = useState<'FOCUS' | 'SHORT' | 'LONG'>('FOCUS');
   const [pomoStreak, setPomoStreak] = useState(0);
 
-  // 7. EXAMS & STUDY JOURNAL (NEW)
+  // 7. EXAMS & STUDY JOURNAL
   const [exams, setExams] = useState<Exam[]>(() => {
       const saved = localStorage.getItem('academy_exams');
       return saved ? JSON.parse(saved) : [
-          { id: '1', name: 'GRE Exam', date: '2025-10-14', startDate: new Date().toISOString().split('T')[0] }
+          { id: '1', name: 'GRE Exam', date: '2025-10-14', startDate: getLocalDate() }
       ];
   });
-  const [newExam, setNewExam] = useState({ name: '', date: '', startDate: '' });
+  const [newExam, setNewExam] = useState({ name: '', date: '', startDate: getLocalDate() });
+  
+  // EDIT EXAM STATE
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
+  const [editExamForm, setEditExamForm] = useState<Exam | null>(null);
 
   const [studyLogs, setStudyLogs] = useState<StudyLog[]>(() => {
       const saved = localStorage.getItem('academy_logs');
@@ -167,7 +153,6 @@ export const TheAcademy: React.FC = () => {
     } else if (pomoTime === 0) {
       setIsPomoActive(false);
       if (pomoMode === 'FOCUS') setPomoStreak(s => s + 1);
-      // Optional: Audio alert here
     }
     return () => clearInterval(interval);
   }, [isPomoActive, pomoTime, pomoMode]);
@@ -185,8 +170,6 @@ export const TheAcademy: React.FC = () => {
               setTimeRemaining("00:00:00");
               clearInterval(interval);
           } else {
-              const hours = Math.floor((distance % (1000 * 60 * 60 * 48 * 365)) / (1000 * 60 * 60)); // Simple hours display
-              // For 48h, hours can be > 24.
               const totalHours = Math.floor(distance / (1000 * 60 * 60));
               const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
               const seconds = Math.floor((distance % (1000 * 60)) / 1000);
@@ -272,12 +255,29 @@ export const TheAcademy: React.FC = () => {
   // JOURNAL HANDLERS
   const handleAddExam = () => {
       if (!newExam.name || !newExam.date) return;
-      setExams([...exams, { id: Date.now().toString(), name: newExam.name, date: newExam.date, startDate: newExam.startDate || new Date().toISOString().split('T')[0] }]);
-      setNewExam({ name: '', date: '', startDate: '' });
+      setExams([...exams, { 
+          id: Date.now().toString(), 
+          name: newExam.name, 
+          date: newExam.date, 
+          startDate: newExam.startDate || getLocalDate()
+      }]);
+      setNewExam({ name: '', date: '', startDate: getLocalDate() });
   };
 
   const handleDeleteExam = (id: string) => {
       setExams(exams.filter(e => e.id !== id));
+  };
+
+  const startEditingExam = (exam: Exam) => {
+      setEditingExamId(exam.id);
+      setEditExamForm({ ...exam });
+  };
+
+  const saveExamEdit = () => {
+      if (!editExamForm || !editExamForm.name || !editExamForm.date) return;
+      setExams(exams.map(e => e.id === editExamForm.id ? editExamForm : e));
+      setEditingExamId(null);
+      setEditExamForm(null);
   };
 
   const handleAddLog = () => {
@@ -313,21 +313,19 @@ export const TheAcademy: React.FC = () => {
        {/* KPI BOARD */}
        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm">
-             <p className="text-xs text-gray-500 uppercase">Productivity Score</p>
+             <p className="text-xs text-gray-500 uppercase font-bold">Productivity Score</p>
              <p className="text-2xl font-mono font-bold text-wealth-green">85.0%</p>
           </div>
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm">
-             <p className="text-xs text-gray-500 uppercase">Current Streak</p>
+             <p className="text-xs text-gray-500 uppercase font-bold">Current Streak</p>
              <p className="text-2xl font-mono font-bold text-spartan-red">52 Days</p>
           </div>
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm">
-             <p className="text-xs text-gray-500 uppercase">Gaps to Close</p>
-             <p className="text-2xl font-mono font-bold text-amber-500">
-                 {gapsCount}
-             </p>
+             <p className="text-xs text-gray-500 uppercase font-bold">Gaps to Close</p>
+             <p className="text-2xl font-mono font-bold text-amber-500">{gapsCount}</p>
           </div>
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm">
-             <p className="text-xs text-gray-500 uppercase">Capital Score</p>
+             <p className="text-xs text-gray-500 uppercase font-bold">Capital Score</p>
              <p className="text-2xl font-mono font-bold text-blue-500">{capitalScore}/{totalCapitalTarget}</p>
           </div>
        </div>
@@ -465,7 +463,6 @@ export const TheAcademy: React.FC = () => {
 
   const renderSystems = () => (
     <div className="space-y-6 animate-in fade-in">
-        {/* DECISION FLOWCHART VISUALIZATION */}
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase mb-6 flex items-center gap-2">
                 <Zap className="text-yellow-400"/> Master Decision Flowchart
@@ -491,7 +488,7 @@ export const TheAcademy: React.FC = () => {
             </div>
         </div>
 
-        {/* EVENING 5-POINT CHECK */}
+        {/* EVENING CHECK */}
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase mb-4 flex items-center gap-2">
                 <Heart className="text-pink-500"/> Everyday 5-Point Self-Check
@@ -525,43 +522,36 @@ export const TheAcademy: React.FC = () => {
                 <AlertTriangle className="text-orange-500" />
                 <h3 className="font-bold text-gray-900 dark:text-white uppercase">Failure Immunity Log</h3>
             </div>
-            <div className="bg-orange-50 dark:bg-black p-4 rounded border border-orange-200 dark:border-gray-800 text-sm mb-4">
-                <strong className="text-orange-500 dark:text-orange-400">Concept:</strong> Treat failures as DATA, not defeat. Reframe rejection as redirection.
-            </div>
-            {/* Input Form */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
                 <input 
                     type="text" 
                     placeholder="What Failed?" 
                     value={newFailure.what}
                     onChange={(e) => setNewFailure({...newFailure, what: e.target.value})}
-                    className="bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-gray-700 p-2 rounded text-gray-900 dark:text-white text-xs focus:border-orange-500 outline-none" 
+                    className="bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-gray-700 p-2 rounded text-gray-900 dark:text-white text-xs outline-none" 
                 />
                 <input 
                     type="text" 
                     placeholder="Why? (Root Cause)" 
                     value={newFailure.why}
                     onChange={(e) => setNewFailure({...newFailure, why: e.target.value})}
-                    className="bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-gray-700 p-2 rounded text-gray-900 dark:text-white text-xs focus:border-orange-500 outline-none" 
+                    className="bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-gray-700 p-2 rounded text-gray-900 dark:text-white text-xs outline-none" 
                 />
                 <input 
                     type="text" 
                     placeholder="Lesson Learned" 
                     value={newFailure.lesson}
                     onChange={(e) => setNewFailure({...newFailure, lesson: e.target.value})}
-                    className="bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-gray-700 p-2 rounded text-gray-900 dark:text-white text-xs focus:border-orange-500 outline-none" 
+                    className="bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-gray-700 p-2 rounded text-gray-900 dark:text-white text-xs outline-none" 
                 />
             </div>
             <button 
                 onClick={handleLogFailure}
-                className="bg-orange-100 dark:bg-orange-600/20 text-orange-600 dark:text-orange-500 border border-orange-200 dark:border-orange-600 w-full py-2 rounded text-xs font-bold uppercase hover:bg-orange-200 dark:hover:bg-orange-600/40 mb-6"
+                className="bg-orange-100 dark:bg-orange-600/20 text-orange-600 dark:text-orange-500 border border-orange-200 w-full py-2 rounded text-xs font-bold uppercase hover:bg-orange-200 mb-6"
             >
                 Log Failure Data
             </button>
-            
-            {/* Log List */}
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {failureLog.length === 0 && <p className="text-xs text-gray-500 text-center italic">No failures logged yet. Go fail at something.</p>}
                 {failureLog.map((f: any) => (
                     <div key={f.id} className="bg-gray-50 dark:bg-black p-3 rounded border border-gray-200 dark:border-gray-800 relative group">
                         <div className="flex justify-between items-start">
@@ -569,8 +559,8 @@ export const TheAcademy: React.FC = () => {
                             <button onClick={() => handleDeleteFailure(f.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={12}/></button>
                         </div>
                         <p className="text-gray-900 dark:text-white text-sm font-bold">{f.what}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1"><span className="text-orange-500">Why:</span> {f.why}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400"><span className="text-green-500">Lesson:</span> {f.lesson}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1"><span className="text-orange-500 font-bold">Why:</span> {f.why}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400"><span className="text-green-500 font-bold">Lesson:</span> {f.lesson}</p>
                     </div>
                 ))}
             </div>
@@ -580,10 +570,7 @@ export const TheAcademy: React.FC = () => {
 
   const renderAcademics = () => (
     <div className="space-y-6 animate-in fade-in">
-        {/* --- DEEP WORK COMMAND CENTER (POMODORO & SPRINT) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            {/* 1. POMODORO STATION */}
             <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg relative overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between mb-6 relative z-10">
                     <div className="flex items-center gap-2">
@@ -606,19 +593,15 @@ export const TheAcademy: React.FC = () => {
                         ))}
                     </div>
                 </div>
-
                 <div className="flex flex-col items-center justify-center py-6 relative z-10">
                     <div className="text-6xl font-mono font-black text-gray-900 dark:text-white tracking-widest mb-6">
                         {formatTime(pomoTime)}
                     </div>
-                    
                     <div className="flex gap-4">
                         <button 
                             onClick={() => setIsPomoActive(!isPomoActive)}
                             className={`flex items-center gap-2 px-6 py-3 rounded font-bold uppercase text-xs tracking-widest transition-all ${
-                                isPomoActive 
-                                ? 'bg-yellow-500 hover:bg-yellow-400 text-black' 
-                                : 'bg-green-600 hover:bg-green-500 text-white'
+                                isPomoActive ? 'bg-yellow-500 text-black' : 'bg-green-600 text-white'
                             }`}
                         >
                             {isPomoActive ? <Pause size={16}/> : <Play size={16}/>}
@@ -626,158 +609,67 @@ export const TheAcademy: React.FC = () => {
                         </button>
                         <button 
                             onClick={() => { setIsPomoActive(false); setPomoModeHandler(pomoMode); }}
-                            className="p-3 rounded bg-gray-200 dark:bg-slate-800 hover:bg-gray-300 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-400 transition-colors"
+                            className="p-3 rounded bg-gray-200 dark:bg-slate-800 text-gray-600 dark:text-gray-400"
                         >
                             <RotateCcw size={16}/>
                         </button>
                     </div>
                 </div>
-
                 <div className="mt-6 flex justify-between items-center text-xs text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4 relative z-10">
-                    <span>Sessions Completed Today: <span className="text-gray-900 dark:text-white font-bold">{pomoStreak}</span></span>
-                    <span className="flex items-center gap-1"><Coffee size={12}/> {pomoMode === 'FOCUS' ? 'Stay Hard.' : 'Recover.'}</span>
+                    <span>Sessions: <span className="text-gray-900 dark:text-white font-bold">{pomoStreak}</span></span>
+                    <span className="flex items-center gap-1"><Coffee size={12}/> Focus Hard.</span>
                 </div>
-                
-                {/* Background Decoration */}
-                <Timer size={200} className="absolute -bottom-10 -right-10 text-purple-200 dark:text-purple-900/20 opacity-20 pointer-events-none" />
             </div>
 
-            {/* 2. 48-HOUR SPRINT OPERATIONS */}
             <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg relative overflow-hidden flex flex-col shadow-sm">
                 <div className="flex items-center justify-between mb-6 relative z-10">
                     <div className="flex items-center gap-2">
                         <Clock className="text-spartan-red" />
                         <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Op: 48-Hour Sprint</h3>
                     </div>
-                    {sprintEndTime && (
-                        <span className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500 px-2 py-1 rounded border border-red-200 dark:border-red-900 font-bold animate-pulse">
-                            ACTIVE
-                        </span>
-                    )}
                 </div>
-
                 <div className="flex-1 flex flex-col relative z-10">
-                    {/* Objective Display */}
                     <div className="bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-800 p-4 rounded mb-6">
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-[10px] text-gray-500 uppercase font-bold">Current Objective (Parkinson's Law)</span>
-                            <button onClick={() => setIsEditingSprint(!isEditingSprint)} className="text-gray-400 hover:text-gray-900 dark:hover:text-white"><Edit3 size={12}/></button>
+                            <span className="text-[10px] text-gray-500 uppercase font-bold">Objective</span>
+                            <button onClick={() => setIsEditingSprint(!isEditingSprint)} className="text-gray-400"><Edit3 size={12}/></button>
                         </div>
                         {isEditingSprint ? (
                             <textarea 
                                 value={sprintObjective}
                                 onChange={(e) => setSprintObjective(e.target.value)}
-                                className="w-full bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm p-2 rounded border border-gray-300 dark:border-gray-700 outline-none focus:border-spartan-red h-20 resize-none"
+                                className="w-full bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm p-2 rounded border outline-none focus:border-spartan-red h-20 resize-none"
                             />
                         ) : (
-                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-relaxed">{sprintObjective}</p>
+                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{sprintObjective}</p>
                         )}
                     </div>
-
-                    {/* Countdown Display */}
                     <div className="mt-auto text-center">
                         {sprintEndTime ? (
                             <>
-                                <div className="text-4xl md:text-5xl font-mono font-black text-gray-900 dark:text-white tracking-widest mb-4 tabular-nums">
+                                <div className="text-4xl md:text-5xl font-mono font-black text-gray-900 dark:text-white tracking-widest mb-4">
                                     {timeRemaining}
                                 </div>
-                                <button 
-                                    onClick={resetSprint}
-                                    className="text-xs text-red-500 hover:text-red-400 font-bold uppercase tracking-widest"
-                                >
-                                    Abort Mission
-                                </button>
+                                <button onClick={resetSprint} className="text-xs text-red-500 font-bold uppercase">Abort Mission</button>
                             </>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full">
-                                <p className="text-xs text-gray-500 mb-4 text-center">"Work expands to fill the time available."<br/>Set a 48h deadline to force completion.</p>
-                                <button 
-                                    onClick={startSprint}
-                                    className="bg-spartan-red hover:bg-red-600 text-white font-bold py-3 px-8 rounded uppercase text-xs tracking-widest transition-all shadow-lg shadow-red-500/20"
-                                >
-                                    Initialize Sprint
-                                </button>
-                            </div>
+                            <button onClick={startSprint} className="bg-spartan-red text-white font-bold py-3 px-8 rounded uppercase text-xs tracking-widest">Initialize Sprint</button>
                         )}
                     </div>
                 </div>
             </div>
         </div>
 
-        {/* 3. THE 1% STUDY PROTOCOL (VISUALIZED PHASES) */}
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
             <div className="flex items-center gap-2 mb-6">
                 <GraduationCap className="text-blue-500" />
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">The 1% Study Protocol</h3>
             </div>
-            
             <div className="space-y-4">
                 {STUDY_PHASES.map((p, idx) => (
-                    <div key={idx} className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 p-4 rounded-lg relative overflow-hidden group hover:border-blue-500 transition-colors">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-600"></div>
+                    <div key={idx} className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 p-4 rounded-lg border-l-4 border-l-blue-600">
                         <h4 className="text-blue-600 dark:text-blue-400 text-xs font-bold uppercase mb-1">{p.phase}: {p.rule}</h4>
-                        <p className="text-gray-700 dark:text-gray-300 text-sm font-medium">{p.action}</p>
-                    </div>
-                ))}
-            </div>
-        </div>
-
-        {/* 4. GENIUS LEARNING RULES */}
-        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
-            <div className="flex items-center gap-2 mb-6">
-                <Lightbulb className="text-gold" />
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Genius Learning Rules</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {GENIUS_LEARNING_RULES.map((rule, idx) => (
-                    <div key={idx} className="bg-gray-50 dark:bg-black p-3 rounded border border-gray-200 dark:border-gray-800">
-                        <p className="text-amber-600 dark:text-gold font-bold text-xs uppercase mb-1">{rule.title}</p>
-                        <p className="text-gray-600 dark:text-gray-400 text-xs">{rule.desc}</p>
-                    </div>
-                ))}
-            </div>
-        </div>
-
-        {/* 5. MY GAPS TO CLOSE */}
-        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg border-l-4 border-l-red-600 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">❌ Gaps to Close</h3>
-                <div className="flex gap-2">
-                    <input 
-                        className="bg-gray-100 dark:bg-black border border-gray-300 dark:border-gray-700 text-xs text-gray-900 dark:text-white p-2 rounded w-32 outline-none" 
-                        placeholder="New Gap..." 
-                        value={newGapName}
-                        onChange={(e) => setNewGapName(e.target.value)}
-                    />
-                     <input 
-                        className="bg-gray-100 dark:bg-black border border-gray-300 dark:border-gray-700 text-xs text-gray-900 dark:text-white p-2 rounded w-24 outline-none" 
-                        placeholder="Deadline..." 
-                        value={newGapDeadline}
-                        onChange={(e) => setNewGapDeadline(e.target.value)}
-                    />
-                    <button onClick={handleAddGap} className="bg-gray-200 dark:bg-gray-800 text-black dark:text-white p-2 rounded hover:bg-gray-300 dark:hover:bg-gray-700"><Plus size={14}/></button>
-                </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {gaps.map((gap: any) => (
-                    <div key={gap.id} className={`flex justify-between items-center p-3 bg-gray-50 dark:bg-black rounded border cursor-pointer select-none transition-all ${gap.status === 'Done' ? 'opacity-50 border-gray-200 dark:border-gray-800' : 'border-gray-300 dark:border-gray-700 hover:border-gray-500'}`} onClick={() => handleToggleGapStatus(gap.id)}>
-                        <div>
-                            <p className={`font-bold text-sm ${gap.status === 'Done' ? 'text-gray-500 line-through' : 'text-gray-800 dark:text-gray-200'}`}>{gap.name}</p>
-                            <p className="text-xs text-red-500 dark:text-red-400 font-mono">Deadline: {gap.deadline}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${
-                                gap.status === 'Done' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500' : 
-                                gap.status === 'Critical' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500' : 
-                                'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                            }`}>
-                                {gap.status}
-                            </span>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteGap(gap.id); }} className="text-gray-400 hover:text-red-500">
-                                <Trash2 size={12}/>
-                            </button>
-                        </div>
+                        <p className="text-gray-700 dark:text-gray-300 text-sm">{p.action}</p>
                     </div>
                 ))}
             </div>
@@ -785,199 +677,197 @@ export const TheAcademy: React.FC = () => {
     </div>
   );
 
-  const renderJournal = () => (
-      <div className="space-y-6 animate-in fade-in">
-          {/* EXAM COUNTDOWN MATRIX */}
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-green-500/10 to-transparent rounded-bl-full pointer-events-none"></div>
-              <div className="flex justify-between items-center mb-6 relative z-10">
-                  <div className="flex items-center gap-2">
-                      <Calendar className="text-green-500" />
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Exam Countdown Matrix</h3>
-                  </div>
-                  <div className="flex gap-2">
-                      <input 
-                          value={newExam.name} 
-                          onChange={(e) => setNewExam({...newExam, name: e.target.value})} 
-                          placeholder="Exam Name..." 
-                          className="bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 text-xs p-2 rounded text-gray-900 dark:text-white outline-none w-32"
-                      />
-                      <input 
-                          type="date"
-                          value={newExam.date} 
-                          onChange={(e) => setNewExam({...newExam, date: e.target.value})} 
-                          className="bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 text-xs p-2 rounded text-gray-900 dark:text-white outline-none"
-                      />
-                      <button onClick={handleAddExam} className="bg-green-600 hover:bg-green-500 text-white p-2 rounded"><Plus size={14}/></button>
-                  </div>
-              </div>
+  const renderJournal = () => {
+    // UPDATED EXPERT CALCULATION LOGIC
+    const getCalculatedData = (targetDateStr: string, startDayStr?: string) => {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        const targetDate = new Date(targetDateStr);
+        targetDate.setHours(0,0,0,0);
+        
+        const diffTime = targetDate.getTime() - today.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 3600 * 24)); // -ve for past, +ve for future
+        
+        // Days Gone/Difference: Positive absolute integer
+        const daysGone = Math.abs(diffDays);
+        
+        // Years Gone: Complete years
+        const yearsGone = Math.floor(daysGone / 365);
+        
+        // Status Logic
+        let status = "Valid";
+        let color = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500";
+        
+        if (diffDays < -60) {
+            status = "Completed";
+            color = "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+        } else if (diffDays >= -60 && diffDays < 0) {
+            status = "Recent";
+            color = "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+        } else if (diffDays === 0) {
+            status = "Today";
+            color = "bg-red-600 text-white animate-pulse";
+        } else if (diffDays > 0 && diffDays <= 7) {
+            status = "Imminent";
+            color = "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-500";
+        } else {
+            status = "Valid";
+            color = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500";
+        }
 
-              <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
-                  <table className="w-full text-left text-sm">
-                      <thead className="bg-green-600 text-white uppercase font-bold text-xs">
-                          <tr>
-                              <th className="p-3">Exam Name</th>
-                              <th className="p-3">Target Date</th>
-                              <th className="p-3 text-center">Days Gone</th>
-                              <th className="p-3 text-center">Days Left</th>
-                              <th className="p-3 text-center">Status</th>
-                              <th className="p-3 text-right">Action</th>
-                          </tr>
-                      </thead>
-                      <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-gray-800">
-                          {exams.map(exam => {
-                              const today = new Date();
-                              const target = new Date(exam.date);
-                              const start = new Date(exam.startDate);
-                              const diffTime = target.getTime() - today.getTime();
-                              const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                              
-                              const goneTime = today.getTime() - start.getTime();
-                              const daysGone = Math.max(0, Math.floor(goneTime / (1000 * 60 * 60 * 24)));
+        return { daysGone, yearsGone, status, color, diffDays };
+    };
 
-                              return (
-                                  <tr key={exam.id} className="hover:bg-gray-50 dark:hover:bg-black/20">
-                                      <td className="p-3 font-bold text-gray-900 dark:text-white">{exam.name}</td>
-                                      <td className="p-3 font-mono text-gray-600 dark:text-gray-400">{exam.date}</td>
-                                      <td className="p-3 text-center font-mono text-blue-500 font-bold">{daysGone}</td>
-                                      <td className="p-3 text-center font-mono font-bold text-xl text-spartan-red">{daysLeft > 0 ? daysLeft : 0}</td>
-                                      <td className="p-3 text-center">
-                                          <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${daysLeft > 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-500' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500'}`}>
-                                              {daysLeft > 0 ? 'Valid' : 'Expired'}
-                                          </span>
-                                      </td>
-                                      <td className="p-3 text-right">
-                                          <button onClick={() => handleDeleteExam(exam.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                                      </td>
-                                  </tr>
-                              );
-                          })}
-                      </tbody>
-                  </table>
-              </div>
-          </div>
+    const sortedExams = [...exams].sort((a, b) => {
+        const dataA = getCalculatedData(a.date);
+        const dataB = getCalculatedData(b.date);
+        // Put Today/Imminent first, then Valid, then Recent, then Completed
+        const getPriority = (s: string) => {
+            if (s === "Today") return 0;
+            if (s === "Imminent") return 1;
+            if (s === "Valid") return 2;
+            if (s === "Recent") return 3;
+            return 4;
+        };
+        return getPriority(dataA.status) - getPriority(dataB.status);
+    });
 
-          {/* ADVANCED PRODUCTIVITY JOURNAL */}
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
-              <div className="flex items-center gap-2 mb-6">
-                  <PenTool className="text-purple-500" />
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Productive Advanced Journal</h3>
-              </div>
+    return (
+    <div className="space-y-6 animate-in fade-in">
+        {/* GOAL TRACKER MATRIX UPGRADE */}
+        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm overflow-hidden relative">
+            <div className="flex justify-between items-center mb-6 relative z-10">
+                <div className="flex items-center gap-2">
+                    <Scan className="text-spartan-red" />
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Goal Tracker Matrix</h3>
+                </div>
+                <div className="flex flex-wrap gap-2 items-end">
+                    <input 
+                        value={newExam.name} 
+                        onChange={(e) => setNewExam({...newExam, name: e.target.value})} 
+                        placeholder="Target Name..." 
+                        className="bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 text-xs p-2 rounded text-gray-900 dark:text-white outline-none w-32"
+                    />
+                    <div>
+                        <label className="text-[9px] text-gray-500 uppercase font-bold block mb-1">Target Date</label>
+                        <input 
+                            type="date"
+                            value={newExam.date} 
+                            onChange={(e) => setNewExam({...newExam, date: e.target.value})} 
+                            className="bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 text-xs p-2 rounded text-gray-900 dark:text-white outline-none"
+                        />
+                    </div>
+                    <button onClick={handleAddExam} className="bg-spartan-red text-white p-2 rounded h-8 flex items-center justify-center mt-auto"><Plus size={16}/></button>
+                </div>
+            </div>
 
-              {/* INPUT AREA */}
-              <div className="bg-gray-50 dark:bg-black p-4 rounded border border-gray-200 dark:border-gray-800 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                      <div className="md:col-span-1">
-                          <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Subject</label>
-                          <input 
-                              placeholder="e.g. GRE Quant" 
-                              value={newLog.subject} 
-                              onChange={(e) => setNewLog({...newLog, subject: e.target.value})}
-                              className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
-                          />
-                      </div>
-                      <div className="md:col-span-2">
-                          <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Topic / Goal</label>
-                          <input 
-                              placeholder="e.g. Geometry Triangles 20 Qs" 
-                              value={newLog.topic} 
-                              onChange={(e) => setNewLog({...newLog, topic: e.target.value})}
-                              className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
-                          />
-                      </div>
-                      <div className="md:col-span-1 flex gap-2">
-                          <div className="flex-1">
-                              <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Duration (Min)</label>
-                              <input 
-                                  type="number"
-                                  value={newLog.duration} 
-                                  onChange={(e) => setNewLog({...newLog, duration: e.target.value})}
-                                  className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
-                              />
-                          </div>
-                          <div className="flex-1">
-                              <label className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Focus (1-10)</label>
-                              <select 
-                                  value={newLog.focus}
-                                  onChange={(e) => setNewLog({...newLog, focus: e.target.value})}
-                                  className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
-                              >
-                                  {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
-                              </select>
-                          </div>
-                      </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                          <label className="text-[10px] text-green-500 uppercase font-bold block mb-1">Feynman Summary (What I learned)</label>
-                          <textarea 
-                              placeholder="Explain simply..." 
-                              value={newLog.summary} 
-                              onChange={(e) => setNewLog({...newLog, summary: e.target.value})}
-                              className="w-full h-20 bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-green-500 resize-none"
-                          />
-                      </div>
-                      <div>
-                          <label className="text-[10px] text-red-500 uppercase font-bold block mb-1">Distractions / Struggles</label>
-                          <textarea 
-                              placeholder="e.g. Phone notif, difficult concept..." 
-                              value={newLog.distraction} 
-                              onChange={(e) => setNewLog({...newLog, distraction: e.target.value})}
-                              className="w-full h-20 bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded text-sm text-gray-900 dark:text-white outline-none focus:border-red-500 resize-none"
-                          />
-                      </div>
-                  </div>
-                  <button onClick={handleAddLog} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded text-xs uppercase tracking-widest transition-all">
-                      Log Session
-                  </button>
-              </div>
+            <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-black/20">
+                <table className="w-full text-left text-sm font-mono">
+                    <thead className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 uppercase font-bold text-xs border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                            <th className="p-4">Event Date</th>
+                            <th className="p-4">Name / Mission</th>
+                            <th className="p-4 text-center">Days Gone/Diff</th>
+                            <th className="p-4 text-center">Status</th>
+                            <th className="p-4 text-center">Years</th>
+                            <th className="p-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                        {sortedExams.map(exam => {
+                            const { daysGone, yearsGone, status, color, diffDays } = getCalculatedData(exam.date);
+                            
+                            if (editingExamId === exam.id && editExamForm) {
+                                return (
+                                    <tr key={exam.id} className="bg-blue-500/5">
+                                        <td colSpan={2} className="p-4">
+                                            <input value={editExamForm.name} onChange={e => setEditExamForm({...editExamForm, name: e.target.value})} className="bg-white dark:bg-black border border-blue-500 p-1 rounded w-full text-xs"/>
+                                            <input type="date" value={editExamForm.date} onChange={e => setEditExamForm({...editExamForm, date: e.target.value})} className="mt-1 bg-white dark:bg-black border border-blue-500 p-1 rounded w-full text-xs"/>
+                                        </td>
+                                        <td colSpan={3} className="p-4 italic text-gray-500">Recalculating...</td>
+                                        <td className="p-4 text-right">
+                                            <button onClick={saveExamEdit} className="text-green-500 mr-2"><Save size={16}/></button>
+                                            <button onClick={() => setEditingExamId(null)} className="text-gray-500"><X size={16}/></button>
+                                        </td>
+                                    </tr>
+                                );
+                            }
 
-              {/* LOGS DISPLAY */}
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                  {studyLogs.length === 0 && <p className="text-center text-gray-500 italic text-sm">No study sessions logged. Get to work.</p>}
-                  {studyLogs.map((log) => (
-                      <div key={log.id} className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 p-4 rounded-lg hover:border-purple-500/50 transition-colors group">
-                          <div className="flex justify-between items-start mb-2">
-                              <div>
-                                  <span className="text-[10px] text-gray-500 font-mono">{log.date} • {log.timestamp}</span>
-                                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">{log.subject}: <span className="font-medium text-gray-600 dark:text-gray-400">{log.topic}</span></h4>
-                              </div>
-                              <button onClick={() => handleDeleteLog(log.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12}/></button>
-                          </div>
-                          
-                          <div className="flex gap-4 text-xs mb-3">
-                              <span className="bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1"><Clock size={10}/> {log.duration}m</span>
-                              <span className={`px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 ${log.focus >= 8 ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-500' : 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-500'}`}>
-                                  <Activity size={10}/> Focus: {log.focus}/10
-                              </span>
-                          </div>
+                            return (
+                                <tr key={exam.id} className="group hover:bg-white dark:hover:bg-white/5 transition-colors">
+                                    <td className="p-4 text-gray-500 dark:text-gray-400">{exam.date}</td>
+                                    <td className="p-4 font-bold text-gray-900 dark:text-white uppercase tracking-tighter">{exam.name}</td>
+                                    <td className="p-4 text-center">
+                                        <span className="font-black text-lg">{daysGone}</span>
+                                        <span className="text-[10px] ml-1 opacity-50">{diffDays < 0 ? 'AGO' : 'LEFT'}</span>
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-black/5 dark:border-white/5 ${color}`}>
+                                            {status}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-center font-bold text-gray-400">
+                                        {yearsGone} <span className="text-[10px] font-normal">Years</span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => startEditingExam(exam)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14}/></button>
+                                            <button onClick={() => handleDeleteExam(exam.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                {sortedExams.length === 0 && <div className="p-8 text-center text-gray-500 italic">No events tracked. Initialize database.</div>}
+            </div>
+            <p className="text-[9px] text-gray-500 mt-3 font-mono uppercase tracking-widest text-center">EXPERT EVENT CALCULATION SERVICE // REAL-TIME DELTA SCANNING</p>
+        </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                              <div className="bg-green-50 dark:bg-green-900/10 p-2 rounded border border-green-100 dark:border-green-900/30">
-                                  <p className="text-[9px] text-green-600 dark:text-green-500 font-bold uppercase mb-1">Learnings</p>
-                                  <p className="text-gray-700 dark:text-gray-300 leading-snug">{log.summary}</p>
-                              </div>
-                              {log.distraction && (
-                                  <div className="bg-red-50 dark:bg-red-900/10 p-2 rounded border border-red-100 dark:border-red-900/30">
-                                      <p className="text-[9px] text-red-600 dark:text-red-500 font-bold uppercase mb-1">Struggles</p>
-                                      <p className="text-gray-700 dark:text-gray-300 leading-snug">{log.distraction}</p>
-                                  </div>
-                              )}
-                          </div>
-                      </div>
-                  ))}
-              </div>
-          </div>
-      </div>
-  );
+        {/* STUDY JOURNAL */}
+        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
+            <div className="flex items-center gap-2 mb-6">
+                <PenTool className="text-purple-500" />
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Study Protocol Journal</h3>
+            </div>
+            <div className="bg-gray-50 dark:bg-black p-4 rounded border border-gray-200 dark:border-gray-800 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <input placeholder="Subject" value={newLog.subject} onChange={(e) => setNewLog({...newLog, subject: e.target.value})} className="bg-white dark:bg-slate-900 border p-2 rounded text-sm outline-none focus:border-purple-500"/>
+                    <input placeholder="Topic / Goal" value={newLog.topic} onChange={(e) => setNewLog({...newLog, topic: e.target.value})} className="bg-white dark:bg-slate-900 border p-2 rounded text-sm outline-none focus:border-purple-500 md:col-span-2"/>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <textarea placeholder="Feynman Summary (Explain simply)" value={newLog.summary} onChange={(e) => setNewLog({...newLog, summary: e.target.value})} className="h-20 bg-white dark:bg-slate-900 border p-2 rounded text-sm outline-none focus:border-purple-500 resize-none"/>
+                    <textarea placeholder="Struggles / Distractions" value={newLog.distraction} onChange={(e) => setNewLog({...newLog, distraction: e.target.value})} className="h-20 bg-white dark:bg-slate-900 border p-2 rounded text-sm outline-none focus:border-purple-500 resize-none"/>
+                </div>
+                <button onClick={handleAddLog} className="w-full bg-purple-600 text-white font-bold py-2 rounded text-xs uppercase">Log Session</button>
+            </div>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {studyLogs.map(log => (
+                    <div key={log.id} className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 p-4 rounded-lg group">
+                        <div className="flex justify-between items-start mb-2">
+                            <div>
+                                <span className="text-[10px] text-gray-500 font-mono">{log.date} • {log.timestamp}</span>
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white uppercase">{log.subject}: {log.topic}</h4>
+                            </div>
+                            <button onClick={() => handleDeleteLog(log.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 italic mb-2">"{log.summary}"</p>
+                        {log.distraction && <p className="text-[10px] text-red-500 font-bold uppercase">Pain Point: {log.distraction}</p>}
+                    </div>
+                ))}
+            </div>
+        </div>
+    </div>
+  )};
 
   const renderCareer = () => (
       <div className="space-y-6 animate-in fade-in">
-          {/* HIGH INCOME JOB TIERS */}
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
               <div className="flex items-center gap-2 mb-6">
                   <Briefcase className="text-emerald-500" />
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">100-Year AI-Resistant Jobs</h3>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">AI-Resistant Job Tiers</h3>
               </div>
               <div className="space-y-4">
                   {CAREER_JOB_TIERS.map((tier, idx) => (
@@ -988,34 +878,11 @@ export const TheAcademy: React.FC = () => {
                           </div>
                           <div className="flex flex-wrap gap-2">
                               {tier.jobs.map((job, jIdx) => (
-                                  <span key={jIdx} className="text-[10px] bg-white dark:bg-slate-900 text-gray-600 dark:text-gray-300 px-2 py-1 rounded border border-gray-300 dark:border-gray-700">
-                                      {job}
-                                  </span>
+                                  <span key={jIdx} className="text-[10px] bg-white dark:bg-slate-900 text-gray-600 dark:text-gray-300 px-2 py-1 rounded border border-gray-300 dark:border-gray-700">{job}</span>
                               ))}
                           </div>
                       </div>
                   ))}
-              </div>
-          </div>
-
-          {/* REMOTE JOB ROADMAP */}
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
-              <div className="flex items-center gap-2 mb-6">
-                  <Globe className="text-blue-400" />
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Remote Job Strategy (BD to Global)</h3>
-              </div>
-              <div className="space-y-4">
-                  {REMOTE_JOB_STEPS.map((step, idx) => (
-                      <div key={idx} className="flex gap-4 items-start">
-                          <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-bold h-6 w-6 rounded-full flex items-center justify-center text-xs border border-blue-200 dark:border-blue-900 shrink-0">
-                              {idx + 1}
-                          </div>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{step.substring(3)}</p>
-                      </div>
-                  ))}
-              </div>
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded text-center">
-                  <p className="text-xs text-blue-500 dark:text-blue-300 font-bold uppercase">"Freelance first → Build Ratings → Scale to Remote Job"</p>
               </div>
           </div>
       </div>
@@ -1024,7 +891,6 @@ export const TheAcademy: React.FC = () => {
   const renderWisdom = () => (
     <div className="space-y-6 animate-in fade-in">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* 10 LIFE RULES */}
             <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                     <List className="text-wealth-green" />
@@ -1038,12 +904,10 @@ export const TheAcademy: React.FC = () => {
                     ))}
                 </ul>
             </div>
-
-            {/* CRITICAL THINKING LEVELS */}
             <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-6 rounded-lg shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                     <Lightbulb className="text-blue-500" />
-                    <h3 className="font-bold text-gray-900 dark:text-white uppercase">5 Levels of Critical Thinking</h3>
+                    <h3 className="font-bold text-gray-900 dark:text-white uppercase">5 Levels of Thinking</h3>
                 </div>
                 <div className="space-y-4">
                     {CRITICAL_THINKING_LEVELS.map((lvl) => (
@@ -1077,7 +941,7 @@ export const TheAcademy: React.FC = () => {
               { id: 'STRATEGY', icon: Target }, 
               { id: 'SYSTEMS', icon: Zap }, 
               { id: 'ACADEMICS', icon: BookOpen }, 
-              { id: 'JOURNAL', icon: PenTool }, // New Tab
+              { id: 'JOURNAL', icon: PenTool }, 
               { id: 'CAREER', icon: Briefcase },
               { id: 'WISDOM', icon: Lightbulb }
           ].map((tab) => (

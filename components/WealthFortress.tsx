@@ -1,1611 +1,591 @@
 
-// ... (imports remain the same)
-import React, { useState, useMemo, useEffect } from 'react';
-import { FinancialState, BusinessEntity, Transaction, Asset, LoanLiability, MonthlyBudgetSnapshot, MoneyMindsetLog } from '../types';
-import { INFLATION_RATE_BD, BUSINESS_STAGES, WEALTH_TIMELINE, SECRETS_OF_RICH_7, FLASH_CARDS } from '../constants';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Bar, BarChart, PieChart, Pie, Cell, Legend, ReferenceLine } from 'recharts';
-import { Activity, Crown, Building2, Rocket, Shield, Wallet, Save, Trash2, Edit3, LayoutDashboard, Plus, TrendingDown, AlertCircle, Settings, RefreshCw, X, ArrowUpRight, ArrowDownRight, TrendingUp, BookOpen, FileText, ClipboardList, Split, Landmark, Cloud, Upload, Download, HardDrive, DollarSign, Briefcase, Zap, Calculator, ArrowRight, Target, CheckCircle, Brain, Lock, Play, Pause, ChevronLeft, ChevronRight, Lightbulb, PiggyBank, GraduationCap, Scale, ListPlus, Map, Sprout, Hammer, LineChart, Flag, Home, Percent } from 'lucide-react';
-
-// ... (rest of imports/interfaces/initial data)
+import React, { useState, useMemo } from 'react';
+import { FinancialState, Transaction, Asset } from '../types';
+import { INFLATION_RATE_BD } from '../constants';
+// Import Terminal from lucide-react to fix missing reference error
+import { Activity, Crown, Rocket, Shield, Save, Trash2, LayoutDashboard, Zap, RefreshCw, Flame, Landmark, TrendingDown, Wallet, ArrowDownRight, ShieldCheck, CreditCard, Inbox, ChevronRight, Edit3, X, ShieldAlert, Percent, Wind, Binary, ArrowDown, Terminal } from 'lucide-react';
 
 interface Props {
   data: FinancialState;
   updateData: (newData: FinancialState) => void;
 }
 
-// --- JOURNAL TYPES ---
-interface JournalData {
-    commitments: { id: string; name: string; details: string; completed: boolean }[];
-    dailyProtocol: { id: string; task: string; completed: boolean }[];
-    receivables: { id: string; name: string; status: 'PENDING' | 'RECEIVED' }[];
-    directives: { id: string; title: string; desc: string }[];
-}
-
-const INITIAL_JOURNAL_DATA: JournalData = {
-    commitments: [
-        { id: '1', name: 'IDLC (Bkash)', details: 'Auto-Debit: 500 BDT', completed: true },
-        { id: '2', name: 'Universal Pension', details: '500 BDT (10 Year Lock)', completed: false }
-    ],
-    dailyProtocol: [
-        { id: '1', task: 'Daily Accounting', completed: false },
-        { id: '2', task: 'Daily Learning', completed: false }
-    ],
-    receivables: [
-        { id: '1', name: 'Mess Refund Money', status: 'PENDING' }
-    ],
-    directives: [
-        { id: '1', title: 'Multiple Income', desc: 'One stream is too close to zero. Diversify or die.' },
-        { id: '2', title: 'Live Like Poor', desc: 'Invest the surplus. Do not upgrade lifestyle until assets pay for it.' }
-    ]
-};
-
 export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
-  const [activeTab, setActiveTab] = useState<'COMMAND' | 'ROADMAP' | 'JOURNAL' | 'PORTFOLIO' | 'OFFENSE' | 'FIRE' | 'AUDIT' | 'BLUEPRINT'>('COMMAND');
-  const [fireChartMode, setFireChartMode] = useState<'WEALTH' | 'VELOCITY'>('WEALTH');
+  const [activeTab, setActiveTab] = useState<'COMMAND' | 'ENGINE' | 'STRATEGY' | 'AUDIT'>('ENGINE');
+  
+  // Ledger Editing State
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
+  const [txEditForm, setTxEditForm] = useState<Transaction | null>(null);
 
-  // --- REALITY JOURNAL STATE (DYNAMIC) ---
-  const [journalData, setJournalData] = useState<JournalData>(() => {
-      const saved = localStorage.getItem('wealth_journal_data_v2');
-      return saved ? JSON.parse(saved) : INITIAL_JOURNAL_DATA;
-  });
-
-  // Local state for adding new items
-  const [newCommitment, setNewCommitment] = useState({ name: '', details: '' });
-  const [newProtocol, setNewProtocol] = useState('');
-  const [newReceivable, setNewReceivable] = useState('');
-  const [newDirective, setNewDirective] = useState({ title: '', desc: '' });
-  const [showAddForms, setShowAddForms] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-      localStorage.setItem('wealth_journal_data_v2', JSON.stringify(journalData));
-  }, [journalData]);
-
-  // --- JOURNAL HANDLERS ---
-  const toggleCommitment = (id: string) => {
-      setJournalData(prev => ({
-          ...prev, commitments: prev.commitments.map(c => c.id === id ? { ...c, completed: !c.completed } : c)
-      }));
-  };
-  const addCommitment = () => {
-      if (!newCommitment.name) return;
-      setJournalData(prev => ({
-          ...prev, commitments: [...prev.commitments, { id: Date.now().toString(), name: newCommitment.name, details: newCommitment.details, completed: false }]
-      }));
-      setNewCommitment({ name: '', details: '' });
-  };
-  const deleteCommitment = (id: string) => setJournalData(prev => ({ ...prev, commitments: prev.commitments.filter(c => c.id !== id) }));
-
-  const toggleProtocol = (id: string) => {
-      setJournalData(prev => ({
-          ...prev, dailyProtocol: prev.dailyProtocol.map(p => p.id === id ? { ...p, completed: !p.completed } : p)
-      }));
-  };
-  const addProtocol = () => {
-      if (!newProtocol) return;
-      setJournalData(prev => ({
-          ...prev, dailyProtocol: [...prev.dailyProtocol, { id: Date.now().toString(), task: newProtocol, completed: false }]
-      }));
-      setNewProtocol('');
-  };
-  const deleteProtocol = (id: string) => setJournalData(prev => ({ ...prev, dailyProtocol: prev.dailyProtocol.filter(p => p.id !== id) }));
-
-  const toggleReceivable = (id: string) => {
-      setJournalData(prev => ({
-          ...prev, receivables: prev.receivables.map(r => r.id === id ? { ...r, status: r.status === 'PENDING' ? 'RECEIVED' : 'PENDING' } : r)
-      }));
-  };
-  const addReceivable = () => {
-      if (!newReceivable) return;
-      setJournalData(prev => ({
-          ...prev, receivables: [...prev.receivables, { id: Date.now().toString(), name: newReceivable, status: 'PENDING' }]
-      }));
-      setNewReceivable('');
-  };
-  const deleteReceivable = (id: string) => setJournalData(prev => ({ ...prev, receivables: prev.receivables.filter(r => r.id !== id) }));
-
-  const addDirective = () => {
-      if (!newDirective.title) return;
-      setJournalData(prev => ({
-          ...prev, directives: [...prev.directives, { id: Date.now().toString(), title: newDirective.title, desc: newDirective.desc }]
-      }));
-      setNewDirective({ title: '', desc: '' });
-  };
-  const deleteDirective = (id: string) => setJournalData(prev => ({ ...prev, directives: prev.directives.filter(d => d.id !== id) }));
-
-  const toggleAddForm = (key: string) => setShowAddForms(prev => ({...prev, [key]: !prev[key]}));
-
-  // --- 1. EXPERT METRICS ENGINE ---
+  // --- 1. METRICS ENGINE (Billionaire IQ) ---
   const metrics = useMemo(() => {
-    const safeAssets = data?.assets || [];
-    const safeLoans = data?.loans || [];
-    const safeBiz = data?.businesses || [];
-    const safeTx = data?.transactions || [];
-    const safeLogs = data?.mindsetLogs || [];
-
-    const totalAssets = safeAssets.reduce((acc, curr) => acc + (curr?.value || 0), 0);
-    const totalDebt = safeLoans.reduce((acc, curr) => acc + (curr?.amount || 0), 0);
-    const businessValuation = safeBiz.reduce((acc, curr) => acc + (curr?.valuation || 0), 0);
+    const totalAssets = (data.assets || []).reduce((acc, curr) => acc + (curr.value || 0), 0);
+    const totalDebt = (data.loans || []).reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const liquidCash = (data.bankA || 0) + (data.bankB || 0) + (data.bankC || 0);
+    const realNetWorth = totalAssets + liquidCash - totalDebt;
     
-    const liquidCash = (data?.bankA || 0) + (data?.bankB || 0) + (data?.bankC || 0);
-    const grossNetWorth = totalAssets + liquidCash + businessValuation;
-    const realNetWorth = grossNetWorth - totalDebt;
-
-    // Inflation Impact Calculation
-    const dailyInflationLoss = (liquidCash * INFLATION_RATE_BD) / 365;
-
-    // Monthly Flow
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const thisMonthTx = safeTx.filter(t => t?.date?.startsWith(currentMonth));
-    const income = thisMonthTx.filter(t => t.category === 'Income').reduce((a, t) => a + (t.amount || 0), 0);
-    const expenses = thisMonthTx.filter(t => t.category !== 'Income').reduce((a, t) => a + Math.abs(t.amount || 0), 0);
+    const passiveIncomeMo = (data.assets || []).reduce((acc, curr) => acc + (curr.value * ((curr.roi || 0) / 100 / 12)), 0);
+    const emiTotal = (data.loans || []).reduce((acc, curr) => acc + (curr.monthlyEMI || 0), 0);
+    const burnRate = (data.bankC > 0 ? data.bankC : 50000) + emiTotal; 
     
-    const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
-    const burnRate = expenses > 0 ? expenses : 15000; 
-    const runway = burnRate > 0 ? liquidCash / burnRate : 0;
+    const freedomRatio = burnRate > 0 ? (passiveIncomeMo / burnRate) * 100 : 0;
+    const emergencyTarget = burnRate * 6;
+    const emergencyProgress = Math.min(100, (data.bankA / emergencyTarget) * 100);
 
-    const weightedRoiSum = safeAssets.reduce((acc, curr) => acc + (curr.value * (curr.roi || 0)), 0);
-    const weightedAvgRoi = totalAssets > 0 ? weightedRoiSum / totalAssets : 0;
-    const annualPassiveIncome = safeAssets.reduce((acc, curr) => acc + (curr.value * (curr.roi/100)), 0);
-
-    const totalGuiltFreeSpent = safeLogs.reduce((acc, curr) => acc + (curr.guiltFreeSpent || 0), 0);
-    const guiltFreeBudget = income * 0.10; 
-
-    return { totalAssets, totalDebt, businessValuation, liquidCash, realNetWorth, grossNetWorth, income, expenses, savingsRate, burnRate, runway, weightedAvgRoi, guiltFreeBudget, totalGuiltFreeSpent, dailyInflationLoss, annualPassiveIncome };
+    return { totalAssets, totalDebt, liquidCash, realNetWorth, passiveIncomeMo, burnRate, freedomRatio, emergencyTarget, emergencyProgress };
   }, [data]);
 
-  // --- 2. STATE MANAGEMENT ---
-  const [txForm, setTxForm] = useState<{
-    id?: string;
-    date: string;
-    type: 'Income' | 'Expense';
-    amount: string;
-    desc: string;
-    category: string;
-    bank: 'A' | 'B' | 'C';
-    autoDistribute: boolean;
-  }>({ 
-      date: new Date().toISOString().split('T')[0], 
-      type: 'Expense', 
-      amount: '', 
-      desc: '', 
-      category: 'Needs', 
-      bank: 'C',
-      autoDistribute: true 
-  });
-  
-  const [isEditingTx, setIsEditingTx] = useState(false);
-  const [assetForm, setAssetForm] = useState<{ id?: string; name: string; value: string; type: string; roi: string }>({ name: '', value: '', type: 'Stock', roi: '' });
-  const [isEditingAsset, setIsEditingAsset] = useState(false);
-  const [loanForm, setLoanForm] = useState<{ id?: string; purpose: string; amount: string; interest: string; emi: string }>({ purpose: '', amount: '', interest: '', emi: '' });
-  const [isEditingLoan, setIsEditingLoan] = useState(false);
-  const [bizForm, setBizForm] = useState<{ id?: string; name: string; revenue: string; valuation: string; stage: number }>({ name: '', revenue: '', valuation: '', stage: 1 });
-  const [isEditingBiz, setIsEditingBiz] = useState(false);
-  const [snapshotForm, setSnapshotForm] = useState<{ id?: string; month: string; income: string; dependents: string; essential: string; nonEssential: string; notes: string; }>({ month: new Date().toISOString().slice(0, 7), income: '', dependents: '0', essential: '', nonEssential: '', notes: '' });
-  const [isEditingSnapshot, setIsEditingSnapshot] = useState(false);
-  const [journalForm, setJournalForm] = useState<MoneyMindsetLog>({ id: '', date: new Date().toISOString().split('T')[0], patternProblem: '', identifyTrigger: '', solveAction: '', guiltFreeSpent: 0, notes: '' });
-  
-  // UPDATED FIRE INPUTS: Added taxRate, type checking and persistence
-  const [fireInputs, setFireInputs] = useState(() => {
-      const saved = localStorage.getItem('wealth_fire_inputs_v2');
-      return saved ? JSON.parse(saved) : { 
-          monthlySip: '5000', 
-          lumpsum: '100000', 
-          inflation: '8.5', 
-          returnRate: '12', 
-          taxRate: '10', // Default 10% Capital Gains Tax
-          target: '10000000', 
-          years: '15' 
-      };
+  // --- 2. WATERFALL ENGINE LOGIC ---
+  const settings = data.engineSettings || {
+    wealthTaxRate: 20,
+    fixedEmiAllocation: 30000,
+    isSweepInEnabled: true,
+    dividendFlywheelActive: true,
+    inflationAdjustment: true,
+    noLifestyleCreep: true,
+    crashModeActive: false
+  };
+
+  const handleEngineToggle = (key: keyof typeof settings) => {
+    updateData({
+      ...data,
+      engineSettings: { ...settings, [key]: !settings[key] }
+    });
+  };
+
+  const handleManualSweep = () => {
+    // THE OVERFLOW: Step 3 of your Strategic Flow
+    const surplus = data.bankC; 
+    if (surplus <= 0) return;
+    updateData({
+      ...data,
+      bankC: 0,
+      bankB: (data.bankB || 0) + surplus,
+      layerOpportunity: (data.layerOpportunity || 0) + surplus,
+      transactions: [{
+        id: Date.now().toString(),
+        date: new Date().toISOString().split('T')[0],
+        description: "Waterfall Overflow Sweep",
+        amount: -surplus,
+        category: 'Investment',
+        bank: 'C'
+      }, {
+        id: (Date.now() + 1).toString(),
+        date: new Date().toISOString().split('T')[0],
+        description: "Sweep into Opportunity Fund",
+        amount: surplus,
+        category: 'Investment',
+        bank: 'B'
+      }, ...data.transactions]
+    });
+    alert(`WATERFALL OVERFLOW: ৳${surplus.toLocaleString()} moved to Account 2 Opportunity Fund.`);
+  };
+
+  const [txForm, setTxForm] = useState({ 
+    date: new Date().toISOString().split('T')[0], 
+    type: 'Expense' as 'Income' | 'Expense' | 'Dividend', 
+    amount: '', 
+    desc: '', 
+    category: 'Needs', 
+    bank: 'C' as 'A' | 'B' | 'C'
   });
 
-  useEffect(() => {
-      localStorage.setItem('wealth_fire_inputs_v2', JSON.stringify(fireInputs));
-  }, [fireInputs]);
-  
-  const [showReconcile, setShowReconcile] = useState(false);
-  const [reconcileValues, setReconcileValues] = useState({ A: '', B: '', C: '' });
-
-  // --- 4. TRANSACTION LOGIC ---
   const handleSaveTransaction = () => {
     if (!txForm.amount || !txForm.desc) return;
     const amountVal = parseFloat(txForm.amount);
-    
-    let currentData = { ...data };
-    
-    // Reverse logic if editing
-    if (isEditingTx && txForm.id) {
-        currentData = reverseTransactionImpact(currentData, txForm.id);
-        currentData.transactions = (currentData.transactions || []).filter(t => t.id !== txForm.id);
+    let newData = { ...data };
+
+    if (txForm.type === 'Income') {
+      // THE WATERFALL AUTOMATION SEQUENCE (Your Exact Request)
+      // Step 1: Fixed amount to Account 3 (Bills)
+      const emiDivert = Math.min(amountVal, settings.fixedEmiAllocation);
+      const remainingAfterEmi = amountVal - emiDivert;
+
+      // Step 2: Wealth Tax % to Account 2 (Investments)
+      const wealthTax = remainingAfterEmi * (settings.wealthTaxRate / 100);
+      const hubFinalDeposit = remainingAfterEmi - wealthTax;
+
+      newData.bankA = (newData.bankA || 0) + hubFinalDeposit;
+      newData.bankB = (newData.bankB || 0) + wealthTax;
+      newData.bankC = (newData.bankC || 0) + emiDivert;
+      
+      // Auto-Layering inside Account 2
+      newData.layerCore = (newData.layerCore || 0) + (wealthTax * 0.7);
+      newData.layerAccelerator = (newData.layerAccelerator || 0) + (wealthTax * 0.3);
+    } else if (txForm.type === 'Dividend') {
+        // THE DIVIDEND FLYWHEEL: Reinvest 100% into Core Layer
+        newData.bankB = (newData.bankB || 0) + amountVal;
+        newData.layerCore = (newData.layerCore || 0) + amountVal;
+    } else {
+      if (txForm.bank === 'A') newData.bankA = (newData.bankA || 0) - amountVal;
+      if (txForm.bank === 'B') newData.bankB = (newData.bankB || 0) - amountVal;
+      if (txForm.bank === 'C') newData.bankC = (newData.bankC || 0) - amountVal;
     }
 
     const newTx: Transaction = {
-        id: txForm.id || Date.now().toString(),
-        date: txForm.date,
-        description: txForm.desc,
-        amount: txForm.type === 'Income' ? amountVal : -amountVal,
-        category: txForm.type === 'Income' ? 'Income' : txForm.category as any,
-        bank: txForm.type === 'Income' ? 'A' : txForm.bank,
-        paymentMethod: 'Manual',
-        subcategory: txForm.autoDistribute ? 'Auto-Split' : 'Manual'
+      id: Date.now().toString(),
+      date: txForm.date,
+      description: txForm.desc,
+      amount: txForm.type === 'Expense' ? -amountVal : amountVal,
+      category: txForm.type === 'Income' ? 'Income' : txForm.type === 'Dividend' ? 'Dividend' : txForm.category as any,
+      bank: txForm.type === 'Income' ? 'A' : txForm.type === 'Dividend' ? 'B' : txForm.bank
     };
 
-    // AUTOMATIC DISTRIBUTION
-    if (txForm.type === 'Income') {
-        if (txForm.autoDistribute) {
-            const wealthAmt = amountVal * 0.20;
-            const survivalAmt = amountVal * 0.80;
-            currentData.bankB = (currentData.bankB || 0) + wealthAmt;
-            currentData.bankC = (currentData.bankC || 0) + survivalAmt;
-        } else {
-            currentData.bankA = (currentData.bankA || 0) + amountVal;
-        }
-    } else {
-        if (txForm.bank === 'A') currentData.bankA = (currentData.bankA || 0) - amountVal;
-        if (txForm.bank === 'B') currentData.bankB = (currentData.bankB || 0) - amountVal;
-        if (txForm.bank === 'C') currentData.bankC = (currentData.bankC || 0) - amountVal;
-    }
-
-    updateData({ ...currentData, transactions: [newTx, ...(currentData.transactions || [])] });
-    setTxForm({ ...txForm, amount: '', desc: '', id: undefined });
-    setIsEditingTx(false);
-  };
-
-  const handleDeleteTransaction = (id: string) => {
-      if(!confirm("DELETE RECORD? Balances will be reverted.")) return;
-      const reversedData = reverseTransactionImpact(data, id);
-      updateData({ ...reversedData, transactions: (reversedData.transactions || []).filter(t => t.id !== id) });
-  };
-
-  const reverseTransactionImpact = (state: FinancialState, txId: string): FinancialState => {
-      const tx = (state.transactions || []).find(t => t.id === txId);
-      if (!tx) return state;
-      const newState = { ...state };
-      const absAmount = Math.abs(tx.amount);
-      
-      if (tx.category === 'Income') {
-          if (tx.subcategory === 'Auto-Split') {
-              newState.bankB = (newState.bankB || 0) - (absAmount * 0.20);
-              newState.bankC = (newState.bankC || 0) - (absAmount * 0.80);
-          } else {
-              newState.bankA = (newState.bankA || 0) - absAmount;
-          }
-      } else {
-          if (tx.bank === 'A') newState.bankA = (newState.bankA || 0) + absAmount;
-          if (tx.bank === 'B') newState.bankB = (newState.bankB || 0) + absAmount;
-          if (tx.bank === 'C') newState.bankC = (newState.bankC || 0) + absAmount;
-      }
-      return newState;
+    newData.transactions = [newTx, ...(newData.transactions || [])];
+    updateData(newData);
+    setTxForm({ ...txForm, amount: '', desc: '', type: 'Expense' });
   };
 
   const startEditTx = (tx: Transaction) => {
-      setTxForm({ id: tx.id, date: tx.date, type: tx.amount > 0 ? 'Income' : 'Expense', amount: Math.abs(tx.amount).toString(), desc: tx.description, category: tx.category, bank: tx.bank, autoDistribute: tx.subcategory === 'Auto-Split' });
-      setIsEditingTx(true);
-      const element = document.getElementById('transaction-form');
-      if (element) element.scrollIntoView({ behavior: 'smooth' });
+    setEditingTxId(tx.id);
+    setTxEditForm({ ...tx });
   };
 
-  // --- ASSET/LOAN LOGIC (Condensed for brevity) ---
-  const handleSaveAsset = () => { if (!assetForm.name) return; const newAsset: Asset = { id: assetForm.id || Date.now().toString(), name: assetForm.name, value: parseFloat(assetForm.value) || 0, type: assetForm.type as any, roi: parseFloat(assetForm.roi) || 0 }; updateData({ ...data, assets: isEditingAsset ? data.assets.map(a => a.id === assetForm.id ? newAsset : a) : [...data.assets, newAsset] }); setAssetForm({ name: '', value: '', type: 'Stock', roi: '' }); setIsEditingAsset(false); };
-  const handleDeleteAsset = (id: string) => updateData({ ...data, assets: data.assets.filter(a => a.id !== id) });
-  const startEditAsset = (a: Asset) => { setAssetForm({ id: a.id, name: a.name, value: a.value.toString(), type: a.type, roi: a.roi.toString() }); setIsEditingAsset(true); };
-
-  const handleSaveLoan = () => { if (!loanForm.purpose) return; const newLoan: LoanLiability = { id: loanForm.id || Date.now().toString(), purpose: loanForm.purpose, amount: parseFloat(loanForm.amount) || 0, interestRate: parseFloat(loanForm.interest) || 0, monthlyEMI: parseFloat(loanForm.emi) || 0, remainingMonths: 0 }; updateData({ ...data, loans: isEditingLoan ? data.loans.map(l => l.id === loanForm.id ? newLoan : l) : [...data.loans, newLoan] }); setLoanForm({ purpose: '', amount: '', interest: '', emi: '' }); setIsEditingLoan(false); };
-  const handleDeleteLoan = (id: string) => updateData({ ...data, loans: data.loans.filter(l => l.id !== id) });
-  const startEditLoan = (l: LoanLiability) => { setLoanForm({ id: l.id, purpose: l.purpose, amount: l.amount.toString(), interest: l.interestRate.toString(), emi: l.monthlyEMI.toString() }); setIsEditingLoan(true); };
-
-  const handleSaveBusiness = () => { if (!bizForm.name) return; const newBiz: BusinessEntity = { id: bizForm.id || Date.now().toString(), name: bizForm.name, type: 'Product', stage: bizForm.stage as any, monthlyRevenue: parseFloat(bizForm.revenue) || 0, valuation: parseFloat(bizForm.valuation) || 0, growthRate: 10 }; updateData({ ...data, businesses: isEditingBiz ? data.businesses.map(b => b.id === bizForm.id ? newBiz : b) : [...data.businesses, newBiz] }); setBizForm({ name: '', revenue: '', valuation: '', stage: 1 }); setIsEditingBiz(false); };
-  const handleDeleteBusiness = (id: string) => updateData({ ...data, businesses: data.businesses.filter(b => b.id !== id) });
-  const startEditBusiness = (b: BusinessEntity) => { setBizForm({ id: b.id, name: b.name, revenue: b.monthlyRevenue.toString(), valuation: b.valuation.toString(), stage: b.stage }); setIsEditingBiz(true); };
-
-  const handleSaveSnapshot = () => { if (!snapshotForm.income) return; const newSnap = { id: snapshotForm.id || Date.now().toString(), month: snapshotForm.month, income: parseFloat(snapshotForm.income) || 0, dependents: parseInt(snapshotForm.dependents) || 0, essentialExpenses: parseFloat(snapshotForm.essential) || 0, nonEssentialExpenses: parseFloat(snapshotForm.nonEssential) || 0, notes: snapshotForm.notes }; updateData({ ...data, budgetSnapshots: isEditingSnapshot ? data.budgetSnapshots.map(s => s.id === snapshotForm.id ? newSnap : s) : [...data.budgetSnapshots, newSnap].sort((a,b) => b.month.localeCompare(a.month)) }); setSnapshotForm({ month: '', income: '', dependents: '0', essential: '', nonEssential: '', notes: '' }); setIsEditingSnapshot(false); };
-  const handleDeleteSnapshot = (id: string) => updateData({ ...data, budgetSnapshots: data.budgetSnapshots.filter(s => s.id !== id) });
-  const startEditSnapshot = (s: MonthlyBudgetSnapshot) => { setSnapshotForm({ id: s.id, month: s.month, income: s.income.toString(), dependents: s.dependents.toString(), essential: s.essentialExpenses.toString(), nonEssential: s.nonEssentialExpenses.toString(), notes: s.notes }); setIsEditingSnapshot(true); };
-
-  const handleSaveJournal = () => { updateData({ ...data, mindsetLogs: [{ ...journalForm, id: Date.now().toString() }, ...(data.mindsetLogs || [])] }); setJournalForm({ id: '', date: '', patternProblem: '', identifyTrigger: '', solveAction: '', guiltFreeSpent: 0, notes: '' }); };
-  const handleDeleteJournal = (id: string) => updateData({ ...data, mindsetLogs: data.mindsetLogs.filter(l => l.id !== id) });
-
-  const handleReconcile = () => {
-      const newA = reconcileValues.A !== '' ? parseFloat(reconcileValues.A) : data.bankA;
-      const newB = reconcileValues.B !== '' ? parseFloat(reconcileValues.B) : data.bankB;
-      const newC = reconcileValues.C !== '' ? parseFloat(reconcileValues.C) : data.bankC;
-      updateData({ ...data, bankA: newA, bankB: newB, bankC: newC });
-      setShowReconcile(false);
-      setReconcileValues({ A: '', B: '', C: '' });
+  const saveTxEdit = () => {
+    if (!txEditForm) return;
+    updateData({
+        ...data,
+        transactions: data.transactions.map(t => t.id === txEditForm.id ? txEditForm : t)
+    });
+    setEditingTxId(null);
+    setTxEditForm(null);
   };
 
-  const updateRoadmap = (field: string, value: any) => {
-      const currentSettings = data.roadmapSettings || { targetMonthlyExpense: metrics.burnRate, sipAmount: 0, hasStartedSIP: false, activePhase: 1 };
-      updateData({ ...data, roadmapSettings: { ...currentSettings, [field]: value } });
+  const deleteTx = (id: string) => {
+    if (confirm("Permanently delete this entry?")) {
+        updateData({
+            ...data,
+            transactions: data.transactions.filter(t => t.id !== id)
+        });
+    }
   };
 
-  const getFinancialClass = (ppi: number) => {
-      if (ppi < 5000) return { label: "Extreme Poor", color: "text-red-600" };
-      if (ppi < 15000) return { label: "Poor", color: "text-orange-500" };
-      if (ppi < 40000) return { label: "Middle Class", color: "text-blue-400" };
-      return { label: "Wealthy", color: "text-gold" };
-  };
+  const renderEngine = () => (
+    <div className="space-y-10 animate-in fade-in">
+      {/* WATERFALL FLOW VISUALIZATION */}
+      <div className="glass-panel p-8 rounded-[2.5rem] border-l-4 border-l-electric-blue relative overflow-hidden bg-gradient-to-br from-obsidian via-slate-900/40 to-obsidian shadow-2xl">
+        <div className="absolute top-0 right-0 p-8 opacity-5 -rotate-12"><Zap size={300} className="text-electric-blue"/></div>
+        
+        <div className="flex flex-col items-center gap-4 relative z-10">
+          <div className="flex items-center gap-3 mb-6">
+             <div className="p-3 bg-electric-blue/20 rounded-2xl border border-electric-blue/30 shadow-[0_0_20px_rgba(41,121,255,0.2)]"><Zap className="text-electric-blue" size={28}/></div>
+             <h3 className="text-3xl font-display font-black text-white uppercase tracking-tighter">Strategic <span className="text-electric-blue">Waterfall</span> Flow</h3>
+          </div>
 
-  if (!data) return <div className="p-10 text-center text-gray-500 animate-pulse">Initializing Core Systems...</div>;
+          {/* STEP 1: INCOME ARRIVAL */}
+          <div className="w-full max-w-sm flex flex-col items-center group">
+            <div className="w-full bg-emerald-950/20 border border-emerald-500/30 p-6 rounded-2xl text-center shadow-2xl transition-all group-hover:border-emerald-400">
+                <div className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mb-1">Step 1: Intake</div>
+                <p className="text-2xl font-display font-black text-white uppercase tracking-tighter">The Rainmaker</p>
+                <div className="h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent w-full my-2"></div>
+                <p className="text-[10px] text-emerald-500/70 font-mono font-bold uppercase tracking-widest">Inflow Pool (Acc 1)</p>
+            </div>
+            <ArrowDown className="text-gray-700 animate-bounce mt-3" size={28}/>
+          </div>
 
-  const renderCommandCenter = () => (
-    <div className="space-y-6 animate-in fade-in">
-        {/* CFO INSIGHTS DASHBOARD */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="glass-panel p-4 rounded-lg relative overflow-hidden group hover:border-gold/50 transition-colors">
-                <div className="absolute top-0 right-0 p-2 opacity-10"><Crown size={48} className="text-white"/></div>
-                <p className="text-[10px] text-gold uppercase font-bold tracking-wider">Real Net Worth</p>
-                <p className="text-2xl font-display font-black text-white mt-1 text-glow-gold">৳ {(metrics.realNetWorth / 1000).toFixed(1)}k</p>
-                <div className="h-1 bg-gray-800 rounded-full mt-2 w-full overflow-hidden">
-                    <div className="h-full bg-gold shadow-[0_0_10px_#FFD700] transition-all duration-1000 ease-out" style={{width: `${Math.min(100, metrics.realNetWorth/10000)}%`}}></div>
+          {/* STEP 2: THE HUB */}
+          <div className="w-full max-w-xl">
+            <div className="bg-slate-900 border border-white/10 p-10 rounded-[3rem] text-center shadow-inner relative group hover:border-electric-blue/50 transition-all">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-black px-6 py-2 rounded-full border-2 border-white/20 shadow-xl tracking-widest uppercase">Account 1: The Command Center</div>
+                
+                <div className="flex flex-col items-center mb-8">
+                    <p className="text-[11px] text-gray-500 font-black uppercase tracking-widest mb-2">Liquid Shield Balance</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-5xl font-mono font-black text-white tracking-tighter">৳ {data.bankA.toLocaleString()}</span>
+                        {settings.isSweepInEnabled && (
+                            <div className="flex items-center gap-1.5 text-[10px] bg-emerald-900/40 text-emerald-400 px-3 py-1 rounded-full border border-emerald-800/50 animate-pulse">
+                                <RefreshCw size={12}/> SWEEP-IN FD
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                    <div className="bg-black/60 p-5 rounded-2xl border border-white/5 group/item hover:border-spartan-red/30 transition-colors">
+                        <p className="text-[10px] text-spartan-red font-black uppercase mb-1">Fixed Divert</p>
+                        <p className="text-sm font-bold text-gray-300 leading-tight">Step 1: Account 3 (EMI)</p>
+                        <p className="text-xl font-mono font-black text-white mt-2">৳ {settings.fixedEmiAllocation.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-black/60 p-5 rounded-2xl border border-white/5 group/item hover:border-wealth-green/30 transition-colors">
+                        <p className="text-[10px] text-wealth-green font-black uppercase mb-1">Wealth Tax ({settings.wealthTaxRate}%)</p>
+                        <p className="text-sm font-bold text-gray-300 leading-tight">Step 2: Account 2 (Lab)</p>
+                        <p className="text-xl font-mono font-black text-white mt-2">৳ {((data.monthlyIncome || 0) * (settings.wealthTaxRate/100)).toLocaleString()}</p>
+                    </div>
                 </div>
             </div>
+          </div>
+
+          <div className="w-full flex justify-between max-w-2xl px-20">
+              <ChevronRight className="rotate-90 text-spartan-red/30" size={32} />
+              <ChevronRight className="rotate-90 text-wealth-green/30" size={32} />
+          </div>
+
+          {/* ACCOUNTS 2 & 3: OPS & LAB */}
+          <div className="flex flex-col md:flex-row gap-8 w-full">
             
-            <div className="glass-panel p-4 rounded-lg hover:bg-white/5 transition-colors">
-                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider flex items-center gap-1">
-                    <TrendingDown size={10} className="text-red-500"/> Inflation Decay
+            {/* OPS */}
+            <div className="flex-1 bg-slate-950 border border-spartan-red/20 p-8 rounded-[2.5rem] relative shadow-2xl flex flex-col group hover:border-spartan-red/40 transition-all">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-spartan-red text-white text-[10px] font-black px-5 py-1.5 rounded-full uppercase tracking-widest shadow-lg">Account 3: Operations</div>
+                <div className="text-center mb-8">
+                    <p className="text-[11px] text-gray-500 font-black uppercase mb-1">Daily Outflow pool</p>
+                    <p className="text-4xl font-mono font-black text-white tracking-tighter">৳ {data.bankC.toLocaleString()}</p>
+                </div>
+                <div className="space-y-4 flex-1">
+                    <div className="p-5 bg-red-950/20 border border-red-900/30 rounded-3xl flex justify-between items-center">
+                        <div>
+                            <p className="text-[10px] text-red-500 font-black uppercase tracking-widest">Bills Reserved</p>
+                            <p className="text-lg font-mono font-black text-white">৳ {settings.fixedEmiAllocation.toLocaleString()}</p>
+                        </div>
+                        <CreditCard size={24} className="text-red-500"/>
+                    </div>
+                    <div className="bg-black/60 p-6 rounded-3xl border border-gray-800 shadow-inner">
+                        <p className="text-[10px] text-blue-400 font-black uppercase italic tracking-widest mb-2">The Overflow Rule</p>
+                        <p className="text-xs text-gray-400 mb-5 leading-relaxed">Flush remaining balance into the Opportunity Fund at end of month.</p>
+                        <button onClick={handleManualSweep} className="w-full py-4 bg-gradient-to-r from-blue-600 to-electric-blue text-white text-[10px] font-black uppercase rounded-2xl shadow-xl transition-all active:scale-95">Execute Overflow Move</button>
+                    </div>
+                </div>
+            </div>
+
+            {/* LAB */}
+            <div className="flex-1 bg-emerald-950/20 border border-wealth-green/20 p-8 rounded-[2.5rem] relative group hover:border-wealth-green/40 hover:bg-emerald-950/30 transition-all shadow-2xl">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-wealth-green text-black text-[10px] font-black px-5 py-1.5 rounded-full uppercase tracking-widest shadow-lg">Account 2: Wealth Lab</div>
+                <div className="text-center mb-8">
+                    <p className="text-[11px] text-emerald-400 font-black uppercase mb-1">Total Investment Power</p>
+                    <p className="text-4xl font-mono font-black text-wealth-green text-glow-green tracking-tighter">৳ {data.bankB.toLocaleString()}</p>
+                </div>
+                <div className="space-y-3">
+                    <div className="bg-black/50 p-5 rounded-2xl border border-white/5 relative group/item overflow-hidden">
+                        <div className="absolute inset-y-0 left-0 w-1.5 bg-blue-500"></div>
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] text-blue-400 font-black uppercase tracking-tighter">Layer 1: Core (SIP)</span>
+                            <Shield size={16} className="text-blue-500" />
+                        </div>
+                        <p className="text-2xl font-mono font-black text-white">৳ {(data.layerCore || 0).toLocaleString()}</p>
+                        {settings.dividendFlywheelActive && (
+                            <div className="absolute top-2 right-4 flex items-center gap-1.5 text-[9px] text-blue-400 font-black uppercase bg-blue-900/20 px-2 py-0.5 rounded-full">
+                                <RefreshCw size={10} className="animate-spin-slow"/> Flywheel
+                            </div>
+                        )}
+                    </div>
+                    <div className="bg-black/50 p-5 rounded-2xl border border-white/5 relative group/item">
+                        <div className="absolute inset-y-0 left-0 w-1.5 bg-spartan-red"></div>
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] text-spartan-red font-black uppercase tracking-tighter">Layer 2: Accelerator</span>
+                            <Rocket size={16} className="text-spartan-red" />
+                        </div>
+                        <p className="text-2xl font-mono font-black text-white">৳ {(data.layerAccelerator || 0).toLocaleString()}</p>
+                    </div>
+                    <div className={`bg-black/50 p-5 rounded-2xl border relative transition-all ${settings.crashModeActive ? 'border-gold bg-gold/5 animate-pulse' : 'border-white/5'}`}>
+                        <div className="absolute inset-y-0 left-0 w-1.5 bg-gold"></div>
+                        <div className="flex justify-between items-center mb-1">
+                            <span className={`text-[11px] font-black uppercase tracking-tighter ${settings.crashModeActive ? 'text-gold' : 'text-gray-400'}`}>Layer 3: Opportunity</span>
+                            <Flame size={16} className={settings.crashModeActive ? 'text-gold' : 'text-gray-600'} />
+                        </div>
+                        <p className={`text-2xl font-mono font-black ${settings.crashModeActive ? 'text-gold' : 'text-white'}`}>৳ {(data.layerOpportunity || 0).toLocaleString()}</p>
+                    </div>
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* UPGRADES GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className={`glass-panel p-6 rounded-[2rem] border-t-4 transition-all cursor-pointer group shadow-xl ${settings.isSweepInEnabled ? 'border-t-electric-blue bg-electric-blue/5' : 'border-t-gray-800'}`} onClick={() => handleEngineToggle('isSweepInEnabled')}>
+          <ShieldCheck size={28} className={settings.isSweepInEnabled ? 'text-electric-blue' : 'text-gray-600'}/>
+          <h4 className="font-black text-white uppercase text-xs mt-3 tracking-[0.2em]">Liquid Shield</h4>
+          <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">Sweep-in FD active on Account 1. Earn FDR interest on emergency funds while maintaining 100% liquidity.</p>
+        </div>
+        
+        <div className={`glass-panel p-6 rounded-[2rem] border-t-4 transition-all cursor-pointer group shadow-xl ${settings.dividendFlywheelActive ? 'border-t-blue-400 bg-blue-400/5' : 'border-t-gray-800'}`} onClick={() => handleEngineToggle('dividendFlywheelActive')}>
+          <Wind size={28} className={settings.dividendFlywheelActive ? 'text-blue-400' : 'text-gray-600'}/>
+          <h4 className="font-black text-white uppercase text-xs mt-3 tracking-[0.2em]">Flywheel</h4>
+          <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">Auto-reinvest 100% of dividends back into Layer 1. Never spend the seed; only eat the fruit of a giant forest.</p>
+        </div>
+
+        <div className={`glass-panel p-6 rounded-[2rem] border-t-4 transition-all cursor-pointer group shadow-xl ${settings.crashModeActive ? 'border-t-gold bg-gold/5' : 'border-t-gray-800'}`} onClick={() => handleEngineToggle('crashModeActive')}>
+          <Flame size={28} className={settings.crashModeActive ? 'text-gold' : 'text-gray-600'}/>
+          <h4 className="font-black text-white uppercase text-xs mt-3 tracking-[0.2em]">Crash Hunter</h4>
+          <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">Deploy Layer 3 Dry Powder when markets drop 10-20% for billionaire growth capture.</p>
+        </div>
+
+        <div className="glass-panel p-6 rounded-[2rem] border-t-4 border-t-wealth-green bg-wealth-green/5 shadow-xl group">
+          <Binary size={28} className="text-wealth-green"/>
+          <h4 className="font-black text-white uppercase text-xs mt-3 tracking-[0.2em]">Tax Shield</h4>
+          <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">Prioritizing ELSS, PPF, and Tax-loss harvesting logic to minimize leakages and maximize CAGR.</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderCommand = () => (
+    <div className="space-y-6 animate-in fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group border-t border-white/5 bg-black/40">
+                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity"><Crown size={56} className="text-white"/></div>
+                <p className="text-[10px] text-gold uppercase font-black tracking-widest">Net Worth Status</p>
+                <p className="text-2xl font-display font-black text-white mt-1 text-glow-gold">৳ {(metrics.realNetWorth / 1000).toFixed(1)}k</p>
+            </div>
+            <div className="glass-panel p-5 rounded-2xl bg-black/40 border-t border-white/5">
+                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest flex items-center gap-2">
+                    <TrendingDown size={14} className="text-red-500"/> Inflation Decay
                 </p>
-                <div className="flex items-baseline gap-1 mt-1">
-                    <p className="text-2xl font-mono font-bold text-spartan-red">
-                        -৳{metrics.dailyInflationLoss.toFixed(1)}
-                    </p>
-                    <span className="text-xs text-gray-500 font-mono">/ Day</span>
-                </div>
-                <p className="text-[10px] text-gray-500 mt-1">Cash loses value daily. Invest.</p>
+                <p className="text-2xl font-mono font-black text-spartan-red mt-1">
+                    -৳{((metrics.liquidCash * INFLATION_RATE_BD) / 365).toFixed(0)} <span className="text-[10px] text-gray-500 uppercase">/Day</span>
+                </p>
             </div>
-
-            <div className="glass-panel p-4 rounded-lg hover:bg-white/5 transition-colors">
-                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Savings Rate</p>
-                <div className="flex items-baseline gap-1 mt-1">
-                    <p className={`text-2xl font-mono font-bold ${metrics.savingsRate >= 20 ? 'text-wealth-green' : 'text-orange-500'}`}>
-                        {metrics.savingsRate.toFixed(0)}%
-                    </p>
-                </div>
-                <p className="text-[10px] text-gray-500 mt-1">Target: 20%+</p>
+            <div className="glass-panel p-5 rounded-2xl bg-black/40 border-t border-white/5">
+                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Freedom Quotient</p>
+                <p className={`text-2xl font-mono font-black mt-1 ${metrics.freedomRatio >= 100 ? 'text-wealth-green' : 'text-orange-500'}`}>
+                    {metrics.freedomRatio.toFixed(1)}%
+                </p>
+                <p className="text-[8px] text-gray-600 font-mono mt-1">Dividends / Operations</p>
             </div>
-
-            <div className="glass-panel p-4 rounded-lg cursor-pointer hover:border-blue-500 transition-colors group" onClick={() => setShowReconcile(true)}>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-[10px] text-blue-400 uppercase font-bold tracking-wider">Liquid Cash</p>
-                        <p className="text-xl font-mono font-bold text-white mt-1 group-hover:text-blue-200 transition-colors">৳ {metrics.liquidCash.toLocaleString()}</p>
-                    </div>
-                    <Settings size={14} className="text-gray-600 group-hover:text-blue-400 transition-colors group-hover:rotate-90 duration-500"/>
-                </div>
-                <div className="flex gap-1 mt-3">
-                    <div className="h-1 bg-gray-700 rounded-full flex-1" title="Bank A"></div>
-                    <div className="h-1 bg-wealth-green rounded-full flex-[2]" title="Bank B"></div>
-                    <div className="h-1 bg-spartan-red rounded-full flex-[3]" title="Bank C"></div>
+            <div className="glass-panel p-5 rounded-2xl border-b-4 border-b-electric-blue bg-black/40 border-t border-white/5">
+                <p className="text-[10px] text-electric-blue uppercase font-black tracking-widest">Liquid Total</p>
+                <p className="text-2xl font-mono font-black text-white mt-1">৳ {metrics.liquidCash.toLocaleString()}</p>
+                <div className="flex gap-1 mt-4">
+                   <div className="h-1.5 bg-blue-500 rounded-full flex-1" title="Hub"></div>
+                   <div className="h-1.5 bg-emerald-500 rounded-full flex-1" title="Lab"></div>
+                   <div className="h-1.5 bg-slate-600 rounded-full flex-1" title="Ops"></div>
                 </div>
             </div>
         </div>
 
-        {/* BANK BALANCES (Breakdown) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             {/* BANK A */}
-             <div className="glass-panel p-4 rounded-lg flex justify-between items-center group hover:bg-white/5 transition-all active:scale-95 duration-200 cursor-pointer" onClick={() => setShowReconcile(true)}>
-                <div>
-                    <span className="text-[10px] text-gray-500 font-bold uppercase block mb-1">Bank A (Inflow Hub)</span>
-                    <p className="text-xl font-mono text-white">৳ {(data.bankA || 0).toLocaleString()}</p>
+        <div className="glass-panel p-8 rounded-3xl border border-white/10 shadow-2xl">
+             <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-3">
+                    <Inbox className="text-electric-blue" size={20} />
+                    <h3 className="text-xl font-display font-black text-white uppercase tracking-wider">Transaction Entry</h3>
                 </div>
-                <div className="p-2 bg-gray-900 rounded border border-gray-800 group-hover:border-gray-600"><Wallet size={16} className="text-gray-500"/></div>
-             </div>
-             {/* BANK B */}
-             <div className="glass-panel p-4 rounded-lg flex justify-between items-center border border-wealth-green/20 hover:border-wealth-green/50 transition-all active:scale-95 duration-200 cursor-pointer" onClick={() => setShowReconcile(true)}>
-                <div>
-                    <span className="text-[10px] text-wealth-green font-bold uppercase block mb-1">Bank B (Wealth)</span>
-                    <p className="text-xl font-mono text-white">৳ {(data.bankB || 0).toLocaleString()}</p>
+                <div className="flex items-center gap-2 bg-emerald-900/10 border border-emerald-500/20 px-4 py-2 rounded-full">
+                    <span className="w-2 h-2 rounded-full bg-wealth-green animate-pulse"></span>
+                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest font-black italic">Waterfall Automator Active</span>
                 </div>
-                <div className="p-2 bg-green-900/20 rounded border border-green-900/50"><Crown size={16} className="text-wealth-green"/></div>
-             </div>
-             {/* BANK C */}
-             <div className="glass-panel p-4 rounded-lg flex justify-between items-center border border-spartan-red/20 hover:border-spartan-red/50 transition-all active:scale-95 duration-200 cursor-pointer" onClick={() => setShowReconcile(true)}>
-                <div>
-                    <span className="text-[10px] text-spartan-red font-bold uppercase block mb-1">Bank C (Survival)</span>
-                    <p className="text-xl font-mono text-white">৳ {(data.bankC || 0).toLocaleString()}</p>
-                </div>
-                <div className="p-2 bg-red-900/20 rounded border border-red-900/50"><Shield size={16} className="text-spartan-red"/></div>
-             </div>
-        </div>
-
-        {/* SMART INPUT FORM (TITANIUM EDITION) */}
-        <div id="transaction-form" className={`glass-panel p-6 rounded-xl transition-all duration-300 ${isEditingTx ? 'border-blue-500 bg-blue-900/10' : 'border-white/10'}`}>
-             <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-2">
-                    <Activity className={isEditingTx ? "text-blue-500" : "text-wealth-green"} />
-                    <h3 className="text-xl font-display font-bold text-white uppercase">{isEditingTx ? "Editing Record..." : "Transaction Protocol"}</h3>
-                </div>
-                {isEditingTx && (
-                    <button 
-                        onClick={() => {setIsEditingTx(false); setTxForm({date: new Date().toISOString().split('T')[0], type:'Expense', amount:'', desc:'', category:'Needs', bank:'C', autoDistribute: true})}} 
-                        className="text-xs bg-red-900/30 text-red-500 px-3 py-1 rounded border border-red-900 hover:bg-red-900/50"
-                    >
-                        Cancel
-                    </button>
-                )}
              </div>
 
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                    {/* TOGGLE */}
-                    <div className="flex bg-black p-1 rounded border border-gray-800">
-                        <button onClick={() => setTxForm({...txForm, type: 'Income'})} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition-all ${txForm.type === 'Income' ? 'bg-wealth-green text-black shadow-[0_0_10px_#00E676]' : 'text-gray-500 hover:text-white'}`}>Income</button>
-                        <button onClick={() => setTxForm({...txForm, type: 'Expense'})} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition-all ${txForm.type === 'Expense' ? 'bg-red-600 text-white shadow-[0_0_10px_#DC2626]' : 'text-gray-500 hover:text-white'}`}>Expense</button>
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div className="space-y-5">
+                    <div className="flex bg-black p-1.5 rounded-xl border border-gray-800 shadow-inner">
+                        <button onClick={() => setTxForm({...txForm, type: 'Income'})} className={`flex-1 py-3 text-xs font-black uppercase rounded-lg transition-all ${txForm.type === 'Income' ? 'bg-wealth-green text-black shadow-[0_0_15px_#00E676]' : 'text-gray-500 hover:text-white'}`}>Income</button>
+                        <button onClick={() => setTxForm({...txForm, type: 'Dividend'})} className={`flex-1 py-3 text-xs font-black uppercase rounded-lg transition-all ${txForm.type === 'Dividend' ? 'bg-blue-600 text-white shadow-[0_0_15px_#2979FF]' : 'text-gray-500 hover:text-white'}`}>Dividend</button>
+                        <button onClick={() => setTxForm({...txForm, type: 'Expense'})} className={`flex-1 py-3 text-xs font-black uppercase rounded-lg transition-all ${txForm.type === 'Expense' ? 'bg-red-600 text-white shadow-[0_0_15px_#DC2626]' : 'text-gray-500 hover:text-white'}`}>Expense</button>
                     </div>
 
-                    <div className="flex gap-2">
-                        <input 
-                            type="number" 
-                            placeholder="Amount" 
-                            value={txForm.amount}
-                            onChange={e => setTxForm({...txForm, amount: e.target.value})}
-                            className="w-1/3 bg-black border border-gray-700 rounded p-3 text-white font-mono text-lg focus:border-blue-500 outline-none placeholder-gray-700 transition-colors focus:shadow-inner"
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="relative group">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-mono font-bold group-focus-within:text-electric-blue">৳</span>
+                            <input 
+                                type="number" 
+                                placeholder="0.00" 
+                                value={txForm.amount}
+                                onChange={e => setTxForm({...txForm, amount: e.target.value})}
+                                className="w-full bg-black border border-gray-800 rounded-xl p-4 pl-9 text-white font-mono text-xl focus:border-electric-blue outline-none transition-all"
+                            />
+                        </div>
                         <input 
                             type="text" 
-                            placeholder="Description (e.g. Salary, Rent)" 
+                            placeholder="Descriptor" 
                             value={txForm.desc}
-                            onChange={e => setTxForm({...txForm, desc: e.target.value})}
-                            className="flex-1 bg-black border border-gray-700 rounded p-3 text-white text-sm focus:border-blue-500 outline-none placeholder-gray-700 transition-colors focus:shadow-inner"
+                            onChange={e => setTxForm({...txForm, desc: e.target.value})} 
+                            className="w-full bg-black border border-gray-800 rounded-xl p-4 text-white text-sm font-bold uppercase focus:border-electric-blue outline-none transition-all"
                         />
                     </div>
                     
-                    <div className="flex gap-2">
-                         <div className="relative w-1/3">
-                            <input 
-                                type="date" 
-                                value={txForm.date}
-                                onChange={e => setTxForm({...txForm, date: e.target.value})}
-                                className="w-full bg-black border border-gray-700 rounded p-2 text-gray-400 text-xs font-mono focus:border-blue-500 outline-none transition-colors"
-                            />
-                        </div>
-                        {txForm.type === 'Expense' && (
-                            <>
-                                <select 
-                                    value={txForm.category}
-                                    onChange={e => setTxForm({...txForm, category: e.target.value})}
-                                    className="flex-1 bg-black border border-gray-700 rounded p-2 text-gray-300 text-xs outline-none focus:border-blue-500 transition-colors"
-                                >
-                                    <option>Needs</option><option>Wants</option><option>Investment</option><option>Debt</option>
-                                </select>
-                                <select 
-                                    value={txForm.bank}
-                                    onChange={e => setTxForm({...txForm, bank: e.target.value as any})}
-                                    className="flex-1 bg-black border border-gray-700 rounded p-2 text-gray-300 text-xs outline-none focus:border-blue-500 transition-colors"
-                                >
-                                    <option value="C">Bank C (Survival)</option>
-                                    <option value="B">Bank B (Wealth)</option>
-                                    <option value="A">Bank A (Inflow)</option>
-                                </select>
-                            </>
-                        )}
-                        {txForm.type === 'Income' && (
-                             <div 
-                                onClick={() => setTxForm(prev => ({...prev, autoDistribute: !prev.autoDistribute}))}
-                                className={`flex-1 flex items-center justify-center gap-2 border rounded cursor-pointer select-none transition-colors ${txForm.autoDistribute ? 'bg-blue-900/30 border-blue-500 text-blue-400 shadow-[0_0_10px_rgba(41,121,255,0.3)]' : 'bg-black border-gray-700 text-gray-500'}`}
-                             >
-                                 <Split size={14} />
-                                 <span className="text-[10px] font-bold uppercase">Auto-Split</span>
-                             </div>
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <input type="date" value={txForm.date} onChange={e => setTxForm({...txForm, date: e.target.value})} className="flex-1 bg-black border border-gray-800 rounded-xl p-3 text-gray-400 text-xs font-mono font-bold outline-none"/>
+                        {txForm.type === 'Expense' ? (
+                            <select value={txForm.bank} onChange={e => setTxForm({...txForm, bank: e.target.value as any})} className="flex-1 bg-black border border-gray-800 rounded-xl p-3 text-gray-300 text-xs font-black uppercase tracking-widest border-l-2 border-l-red-500">
+                                <option value="C">Account 3: Operations</option>
+                                <option value="A">Account 1: The Hub</option>
+                                <option value="B">Account 2: Wealth Lab</option>
+                            </select>
+                        ) : (
+                          <div className="flex-[2] bg-emerald-900/10 border border-emerald-500/30 p-3 rounded-xl text-[10px] text-emerald-400 flex items-center justify-center font-black uppercase tracking-tighter">
+                             {txForm.type === 'Income' ? 'Protocol: EMI Divert -> Wealth Tax -> Hub' : 'Protocol: Auto-Reinvest into Layer 1'}
+                          </div>
                         )}
                     </div>
 
-                    <button onClick={handleSaveTransaction} className={`w-full py-4 rounded text-xs font-black uppercase tracking-[0.2em] transition-all hover:scale-[1.01] active:scale-[0.99] ${txForm.type === 'Income' ? 'bg-wealth-green hover:bg-emerald-400 text-black shadow-[0_0_15px_rgba(0,230,118,0.3)]' : 'bg-red-600 hover:bg-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]'}`}>
-                        {isEditingTx ? "Update Ledger Record" : txForm.type === 'Income' ? "Inject Capital" : "Log Expense"}
+                    <button onClick={handleSaveTransaction} className={`w-full py-5 rounded-2xl text-sm font-black uppercase tracking-[0.3em] transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xl ${txForm.type === 'Income' ? 'bg-wealth-green text-black' : txForm.type === 'Dividend' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'}`}>
+                        {txForm.type === 'Income' ? "Feed Engine" : txForm.type === 'Dividend' ? "Engage Flywheel" : "Log Deduction"}
                     </button>
                 </div>
 
-                {/* VISUALIZER: THE MONEY FLOW */}
-                <div className="bg-black/50 border border-gray-800 p-4 rounded-lg flex flex-col justify-center relative overflow-hidden transition-all hover:border-gray-600">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-4 text-center pb-2 border-b border-gray-800">
-                        Simulation Engine
-                    </p>
+                {/* DISTRIBUTION PREVIEW */}
+                <div className="bg-black/40 border border-gray-800 p-8 rounded-3xl flex flex-col justify-center text-center shadow-inner relative group font-mono">
+                    <div className="absolute top-4 left-4 text-[9px] text-gray-600 font-black uppercase tracking-widest flex items-center gap-2">
+                        <Activity size={10} /> Live Calculation Pulse
+                    </div>
                     {txForm.amount ? (
-                        <div className="space-y-4 relative z-10 animate-in fade-in">
-                            {txForm.type === 'Income' ? (
-                                txForm.autoDistribute ? (
+                      <div className="animate-in fade-in space-y-8">
+                        <div>
+                          <p className="text-4xl font-black text-white tracking-tighter">৳ {parseFloat(txForm.amount).toLocaleString()}</p>
+                          <p className={`text-[11px] mt-2 uppercase font-black tracking-widest ${txForm.type === 'Income' ? 'text-wealth-green' : txForm.type === 'Dividend' ? 'text-blue-400' : 'text-spartan-red'}`}>{txForm.type} Detect Protocol</p>
+                        </div>
+                        {txForm.type === 'Income' && (
+                          <div className="grid grid-cols-3 gap-3">
+                             <div className="bg-blue-900/10 p-4 rounded-2xl border border-blue-900/30">
+                                <p className="text-[9px] text-blue-400 font-black uppercase mb-1">Acc 1 Final</p>
+                                <p className="text-sm font-black text-white">৳ {( (parseFloat(txForm.amount) - Math.min(parseFloat(txForm.amount), settings.fixedEmiAllocation)) * (1 - settings.wealthTaxRate/100) ).toFixed(0)}</p>
+                             </div>
+                             <div className="bg-emerald-900/10 p-4 rounded-2xl border border-emerald-900/30">
+                                <p className="text-[9px] text-emerald-400 font-black uppercase mb-1">Acc 2 Tax</p>
+                                <p className="text-sm font-black text-white">৳ {( (parseFloat(txForm.amount) - Math.min(parseFloat(txForm.amount), settings.fixedEmiAllocation)) * (settings.wealthTaxRate/100) ).toFixed(0)}</p>
+                             </div>
+                             <div className="bg-red-900/10 p-4 rounded-2xl border border-red-900/30">
+                                <p className="text-[9px] text-red-400 font-black uppercase mb-1">Acc 3 EMI</p>
+                                <p className="text-sm font-black text-white">৳ {Math.min(parseFloat(txForm.amount), settings.fixedEmiAllocation).toFixed(0)}</p>
+                             </div>
+                          </div>
+                        )}
+                        {txForm.type === 'Dividend' && (
+                          <div className="flex flex-col items-center justify-center gap-4 text-blue-400 py-6 animate-pulse">
+                             <RefreshCw size={48} className="drop-shadow-[0_0_15px_currentColor] animate-spin-slow" />
+                             <p className="text-xs font-black uppercase tracking-widest">Auto-Reinvesting to Core Layer</p>
+                          </div>
+                        )}
+                        {txForm.type === 'Expense' && (
+                          <div className="flex flex-col items-center justify-center gap-4 text-spartan-red py-6 animate-pulse">
+                             <ArrowDownRight size={48} className="drop-shadow-[0_0_15px_currentColor]" />
+                             <p className="text-xs font-black uppercase tracking-widest">Deducting from Acc {txForm.bank}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-10 opacity-30">
+                        <Terminal size={40} className="text-gray-500 mb-4" />
+                        <p className="text-xs text-gray-500 italic uppercase tracking-widest">Awaiting Pulse...</p>
+                      </div>
+                    )}
+                </div>
+             </div>
+        </div>
+
+        {/* LEDGER */}
+        <div className="glass-panel rounded-3xl overflow-hidden border border-white/5 shadow-2xl">
+             <div className="p-5 border-b border-gray-800 bg-black/60 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <Activity size={16} className="text-spartan-red" />
+                    <h3 className="text-xs font-black text-white uppercase tracking-[0.3em]">Core Intelligence Ledger</h3>
+                </div>
+                <span className="text-[10px] text-gray-600 font-mono font-bold uppercase tracking-widest">{data.transactions.length} Secure Entries</span>
+             </div>
+             <div className="max-h-[500px] overflow-y-auto custom-scrollbar bg-black/20">
+                <table className="w-full text-left text-[11px] text-gray-400">
+                    <thead className="bg-black text-gray-500 font-black sticky top-0 uppercase tracking-widest z-10 border-b border-gray-800">
+                        <tr>
+                            <th className="p-5">Timestamp</th>
+                            <th className="p-5">Descriptor</th>
+                            <th className="p-5">Financial Vector</th>
+                            <th className="p-5 text-right">Delta (৳)</th>
+                            <th className="p-5 text-center">Protocol</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/40">
+                        {data.transactions.map((tx) => (
+                            <tr key={tx.id} className={`transition-colors group ${editingTxId === tx.id ? 'bg-blue-900/10' : 'hover:bg-white/[0.03]'}`}>
+                                {editingTxId === tx.id ? (
                                     <>
-                                        <div className="flex justify-between items-center text-xs">
-                                            <span className="text-gray-400">Total Inflow</span>
-                                            <span className="text-white font-mono font-bold">৳ {parseFloat(txForm.amount).toLocaleString()}</span>
-                                        </div>
-                                        {/* Visualization Lines */}
-                                        <div className="flex gap-2 h-16">
-                                            <div className="w-1/5 bg-wealth-green/20 border border-wealth-green/50 rounded flex flex-col items-center justify-center relative animate-slide-up" style={{animationDelay: '0.1s'}}>
-                                                <span className="text-[10px] text-wealth-green font-bold">20%</span>
-                                                <div className="absolute -bottom-6 text-[10px] text-gray-500 font-bold">Wealth</div>
+                                        <td className="p-4"><input type="date" value={txEditForm?.date} onChange={e => setTxEditForm(prev => prev ? {...prev, date: e.target.value} : null)} className="bg-black border border-gray-700 text-white text-[10px] p-1 rounded w-full outline-none"/></td>
+                                        <td className="p-4"><input value={txEditForm?.description} onChange={e => setTxEditForm(prev => prev ? {...prev, description: e.target.value} : null)} className="bg-black border border-gray-700 text-white text-[10px] p-1 rounded w-full outline-none uppercase font-black"/></td>
+                                        <td className="p-4">
+                                            <div className="flex gap-2">
+                                                <select value={txEditForm?.category} onChange={e => setTxEditForm(prev => prev ? {...prev, category: e.target.value as any} : null)} className="bg-black border border-gray-700 text-white text-[9px] p-1 rounded outline-none"><option>Income</option><option>Expense</option><option>Investment</option><option>Dividend</option></select>
+                                                <select value={txEditForm?.bank} onChange={e => setTxEditForm(prev => prev ? {...prev, bank: e.target.value as any} : null)} className="bg-black border border-gray-700 text-white text-[9px] p-1 rounded outline-none"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
                                             </div>
-                                            <div className="w-4/5 bg-spartan-red/20 border border-spartan-red/50 rounded flex flex-col items-center justify-center relative animate-slide-up" style={{animationDelay: '0.2s'}}>
-                                                <span className="text-[10px] text-spartan-red font-bold">80%</span>
-                                                <div className="absolute -bottom-6 text-[10px] text-gray-500 font-bold">Survival</div>
-                                            </div>
-                                        </div>
-                                        <div className="mt-6 pt-4 border-t border-gray-800 grid grid-cols-2 gap-4 text-center">
-                                            <div>
-                                                <p className="text-[10px] text-wealth-green uppercase">To Bank B</p>
-                                                <p className="text-lg font-mono text-white">৳ {(parseFloat(txForm.amount)*0.2).toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] text-spartan-red uppercase">To Bank C</p>
-                                                <p className="text-lg font-mono text-white">৳ {(parseFloat(txForm.amount)*0.8).toLocaleString()}</p>
-                                            </div>
-                                        </div>
+                                        </td>
+                                        <td className="p-4"><input type="number" value={txEditForm?.amount} onChange={e => setTxEditForm(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)} className="bg-black border border-gray-700 text-white text-[10px] p-1 rounded w-full text-right outline-none"/></td>
+                                        <td className="p-4 text-center"><button onClick={saveTxEdit} className="text-wealth-green p-1"><Save size={14}/></button></td>
                                     </>
                                 ) : (
-                                    <div className="text-center py-8 animate-in fade-in">
-                                        <p className="text-white font-mono text-lg">৳ {parseFloat(txForm.amount).toLocaleString()}</p>
-                                        <p className="text-xs text-gray-500 mt-2">→ Bank A (Pending Distribution)</p>
-                                    </div>
-                                )
-                            ) : (
-                                <div className="text-center py-8 animate-in fade-in">
-                                    <p className="text-red-500 text-2xl font-mono font-bold">- ৳ {parseFloat(txForm.amount).toLocaleString()}</p>
-                                    <p className="text-xs text-gray-500 mt-2 uppercase tracking-wider">Deducted from Bank {txForm.bank}</p>
-                                </div>
-                            )}
-                        </div>
-                    ) : ( 
-                        <div className="flex flex-col items-center justify-center h-40 text-gray-700">
-                            <Calculator size={32} className="mb-2 opacity-50"/>
-                            <p className="text-xs italic">Awaiting Input Data...</p>
-                        </div> 
-                    )}
-                    {/* Background decoration */}
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none"></div>
-                </div>
-             </div>
-        </div>
-
-        {/* LEDGER TABLE */}
-        <div className="glass-panel rounded-lg overflow-hidden">
-             <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-black/20">
-                <h3 className="text-sm font-bold text-white uppercase">Ledger History</h3>
-                <span className="text-[10px] text-gray-500 uppercase">{(data.transactions || []).length} Records</span>
-             </div>
-             <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                <table className="w-full text-left text-xs text-gray-400">
-                    <thead className="bg-black text-gray-500 uppercase font-bold sticky top-0 shadow-sm z-10 backdrop-blur-sm">
-                        <tr>
-                            <th className="p-3">Date</th>
-                            <th className="p-3">Description</th>
-                            <th className="p-3">Category</th>
-                            <th className="p-3">Route</th>
-                            <th className="p-3 text-right">Amount</th>
-                            <th className="p-3 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                        {(data.transactions || []).map((tx) => (
-                            <tr 
-                                key={tx.id} 
-                                className={`transition-colors group hover:bg-white/5 ${isEditingTx && txForm.id === tx.id ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
-                            >
-                                <td className="p-3 font-mono text-gray-500">{tx.date}</td>
-                                <td className="p-3 text-white font-medium">{tx.description}</td>
-                                <td className="p-3"><span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${tx.category === 'Income' ? 'bg-green-900/30 text-green-500' : 'bg-red-900/30 text-red-500'}`}>{tx.category}</span></td>
-                                <td className="p-3 text-gray-500 flex items-center gap-1">
-                                    {tx.category === 'Income' && tx.subcategory === 'Auto-Split' ? <Split size={12}/> : <ArrowRight size={12}/>}
-                                    {tx.category === 'Income' && tx.subcategory === 'Auto-Split' ? 'Auto-Split' : `Bank ${tx.bank}`}
-                                </td>
-                                <td className={`p-3 text-right font-mono font-bold ${tx.amount > 0 ? 'text-wealth-green' : 'text-gray-300'}`}>
-                                    {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}
-                                </td>
-                                <td className="p-3 text-right">
-                                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEditTx(tx)} className="text-blue-500 hover:text-blue-400"><Edit3 size={14}/></button>
-                                        <button onClick={() => handleDeleteTransaction(tx.id)} className="text-gray-500 hover:text-red-500"><Trash2 size={14}/></button>
-                                    </div>
-                                </td>
+                                    <>
+                                        <td className="p-5 font-mono text-gray-600 font-bold">{tx.date}</td>
+                                        <td className="p-5 text-white font-black uppercase tracking-tight text-xs">{tx.description}</td>
+                                        <td className="p-5"><span className={`px-2 py-1 rounded-md border font-black uppercase text-[8px] tracking-widest ${tx.amount > 0 ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-500' : 'bg-red-950/40 border-red-900/30 text-red-500'}`}>{tx.category} [Bank {tx.bank}]</span></td>
+                                        <td className={`p-5 text-right font-mono font-black text-sm tracking-tighter ${tx.amount > 0 ? 'text-wealth-green' : 'text-gray-400'}`}>{tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}</td>
+                                        <td className="p-5 text-center">
+                                            <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => startEditTx(tx)} className="p-1.5 hover:bg-blue-900/30 text-gray-500 hover:text-blue-400 rounded"><Edit3 size={12}/></button>
+                                                <button onClick={() => deleteTx(tx.id)} className="p-1.5 hover:bg-red-900/30 text-gray-500 hover:text-red-500 rounded"><Trash2 size={12}/></button>
+                                            </div>
+                                        </td>
+                                    </>
+                                )}
                             </tr>
                         ))}
                     </tbody>
                 </table>
              </div>
         </div>
-
-        {/* RECONCILIATION MODAL */}
-        {showReconcile && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-slate-950 border border-gray-700 p-6 rounded-lg w-96 shadow-2xl relative">
-                    <button onClick={() => setShowReconcile(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={16}/></button>
-                    <h3 className="text-sm font-bold text-white uppercase mb-4 flex items-center gap-2"><RefreshCw size={14} className="text-blue-500"/> System Override</h3>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-[10px] text-gray-500 uppercase">Bank A (Actual)</label>
-                            <input type="number" placeholder={data.bankA.toString()} value={reconcileValues.A} onChange={e => setReconcileValues({...reconcileValues, A: e.target.value})} className="w-full bg-black border border-gray-700 text-white p-2 rounded mt-1"/>
-                        </div>
-                        <div>
-                            <label className="text-[10px] text-gray-500 uppercase">Bank B (Actual)</label>
-                            <input type="number" placeholder={data.bankB.toString()} value={reconcileValues.B} onChange={e => setReconcileValues({...reconcileValues, B: e.target.value})} className="w-full bg-black border border-gray-700 text-white p-2 rounded mt-1"/>
-                        </div>
-                        <div>
-                            <label className="text-[10px] text-gray-500 uppercase">Bank C (Actual)</label>
-                            <input type="number" placeholder={data.bankC.toString()} value={reconcileValues.C} onChange={e => setReconcileValues({...reconcileValues, C: e.target.value})} className="w-full bg-black border border-gray-700 text-white p-2 rounded mt-1"/>
-                        </div>
-                        <button onClick={handleReconcile} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded text-xs uppercase mt-2">Force Update</button>
-                    </div>
-                </div>
-            </div>
-        )}
     </div>
-  );
-
-  const renderRoadmap = () => {
-      const settings = data.roadmapSettings || { targetMonthlyExpense: metrics.burnRate || 20000, sipAmount: 0, hasStartedSIP: false, activePhase: 1 };
-      
-      const monthlyExpense = settings.targetMonthlyExpense;
-      const survivalScore = monthlyExpense > 0 ? metrics.liquidCash / monthlyExpense : 0;
-      
-      const shieldTarget = monthlyExpense * 6;
-      const shieldProgress = Math.min(100, (metrics.liquidCash / shieldTarget) * 100);
-      
-      const currentPhase = survivalScore < 6 ? 2 : settings.hasStartedSIP ? 4 : 3;
-      const activeStepColor = (step: number) => currentPhase >= step ? 'text-wealth-green' : 'text-gray-600';
-      const activeStepBg = (step: number) => currentPhase >= step ? 'bg-wealth-green/20 border-wealth-green' : 'bg-black border-gray-800';
-
-      return (
-          <div className="space-y-6 animate-in fade-in">
-              {/* HERO: SURVIVAL SCORE */}
-              <div className="glass-panel p-8 rounded-lg relative overflow-hidden text-center border-b-4 border-wealth-green">
-                  <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-2">CURRENT SURVIVAL SCORE</p>
-                  <h1 className="text-6xl font-black text-white font-mono tracking-tighter mb-2">
-                      {survivalScore.toFixed(1)} <span className="text-lg text-gray-500">MONTHS</span>
-                  </h1>
-                  <p className={`text-sm font-bold uppercase ${survivalScore < 6 ? 'text-spartan-red' : 'text-wealth-green'}`}>
-                      {survivalScore < 6 ? "⚠️ DANGER ZONE: BUILD SHIELD" : "✅ SECURE: PLANT SEEDS"}
-                  </p>
-                  <div className="absolute top-0 right-0 p-4 opacity-10"><Map size={120} className="text-white"/></div>
-              </div>
-
-              {/* THE 5 STEPS */}
-              <div className="grid grid-cols-1 gap-4">
-                  {/* STEP 1: REALITY CHECK */}
-                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(1)}`}>
-                      <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">01</div>
-                              <h3 className="text-lg font-bold text-white uppercase">Reality Check</h3>
-                          </div>
-                          {survivalScore > 0 && <CheckCircle className="text-wealth-green" size={20}/>}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                              <p className="text-[10px] text-gray-500 uppercase font-bold">Liquid Cash (Actual)</p>
-                              <p className="text-xl font-mono text-white font-bold">৳ {metrics.liquidCash.toLocaleString()}</p>
-                          </div>
-                          <div>
-                              <p className="text-[10px] text-gray-500 uppercase font-bold">Monthly Expense (Target)</p>
-                              <input 
-                                  type="number" 
-                                  value={settings.targetMonthlyExpense}
-                                  onChange={(e) => updateRoadmap('targetMonthlyExpense', parseFloat(e.target.value))}
-                                  className="bg-black border border-gray-700 text-white font-mono p-1 rounded w-full outline-none focus:border-blue-500"
-                              />
-                          </div>
-                      </div>
-                  </div>
-
-                  {/* STEP 2: BUILD SHIELD */}
-                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(2)}`}>
-                      <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">02</div>
-                              <h3 className="text-lg font-bold text-white uppercase">Build Shield (Emergency Fund)</h3>
-                          </div>
-                          <Shield className={survivalScore < 6 ? "text-spartan-red animate-pulse" : "text-wealth-green"} size={20}/>
-                      </div>
-                      <div className="mb-2 flex justify-between text-xs text-gray-400">
-                          <span>Target (6 Months): ৳ {shieldTarget.toLocaleString()}</span>
-                          <span>{shieldProgress.toFixed(0)}%</span>
-                      </div>
-                      <div className="h-2 bg-black rounded-full overflow-hidden mb-4 border border-gray-800">
-                          <div className="h-full bg-spartan-red transition-all duration-1000" style={{width: `${shieldProgress}%`}}></div>
-                      </div>
-                      {survivalScore < 6 && (
-                          <div className="bg-red-900/20 border border-red-900/50 p-3 rounded text-center">
-                              <p className="text-xs text-red-400 font-bold uppercase">🛑 STOP LUXURY SPENDING. FOCUS ONLY ON SAVING.</p>
-                          </div>
-                      )}
-                  </div>
-
-                  {/* STEP 3: PLANT SEEDS */}
-                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(3)}`}>
-                      <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">03</div>
-                              <h3 className="text-lg font-bold text-white uppercase">Plant Seeds (Automation)</h3>
-                          </div>
-                          <Sprout className={settings.hasStartedSIP ? "text-wealth-green" : "text-gray-500"} size={20}/>
-                      </div>
-                      <div className="flex flex-col md:flex-row gap-4 items-center">
-                          <div className="flex-1 w-full">
-                              <label className="text-[10px] text-gray-500 uppercase font-bold">Monthly SIP Amount</label>
-                              <input 
-                                  type="number" 
-                                  value={settings.sipAmount}
-                                  onChange={(e) => updateRoadmap('sipAmount', parseFloat(e.target.value))}
-                                  placeholder="e.g. 5000"
-                                  className="w-full bg-black border border-gray-700 p-2 rounded text-white font-mono mt-1"
-                              />
-                          </div>
-                          <button 
-                              onClick={() => updateRoadmap('hasStartedSIP', !settings.hasStartedSIP)}
-                              className={`px-4 py-2 rounded text-xs font-bold uppercase border w-full md:w-auto mt-4 md:mt-0 ${settings.hasStartedSIP ? 'bg-wealth-green text-black border-wealth-green' : 'bg-black text-gray-500 border-gray-700 hover:text-white'}`}
-                          >
-                              {settings.hasStartedSIP ? "SIP Active ✅" : "Mark Active"}
-                          </button>
-                      </div>
-                  </div>
-
-                  {/* STEP 4: BUILD ASSETS */}
-                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(4)}`}>
-                      <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">04</div>
-                              <h3 className="text-lg font-bold text-white uppercase">Build Assets</h3>
-                          </div>
-                          <Hammer className="text-blue-500" size={20}/>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                          <div className="bg-black p-3 rounded border border-gray-800">
-                              <Cloud size={20} className="mx-auto text-blue-400 mb-2"/>
-                              <p className="text-[10px] text-gray-300 font-bold uppercase">Digital</p>
-                              <p className="text-[9px] text-gray-600">E-books, Courses</p>
-                          </div>
-                          <div className="bg-black p-3 rounded border border-gray-800">
-                              <LineChart size={20} className="mx-auto text-wealth-green mb-2"/>
-                              <p className="text-[10px] text-gray-300 font-bold uppercase">Financial</p>
-                              <p className="text-[9px] text-gray-600">Stocks, FDR</p>
-                          </div>
-                          <div className="bg-black p-3 rounded border border-gray-800">
-                              <Home size={20} className="mx-auto text-amber-500 mb-2"/>
-                              <p className="text-[10px] text-gray-300 font-bold uppercase">Physical</p>
-                              <p className="text-[9px] text-gray-600">Equipment, Room</p>
-                          </div>
-                      </div>
-                      <button onClick={() => setActiveTab('OFFENSE')} className="w-full mt-4 text-xs bg-blue-900/20 text-blue-400 border border-blue-900 py-2 rounded hover:bg-blue-900/40 uppercase font-bold">
-                          Go to Business Builder
-                      </button>
-                  </div>
-
-                  {/* STEP 5: SCALE UP */}
-                  <div className={`p-6 rounded-lg border transition-all ${activeStepBg(5)}`}>
-                      <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                              <div className="bg-black p-2 rounded border border-gray-700 font-bold text-white">05</div>
-                              <h3 className="text-lg font-bold text-white uppercase">Financial Freedom</h3>
-                          </div>
-                          <Flag className="text-gold" size={20}/>
-                      </div>
-                      
-                      <div className="flex justify-between items-center text-sm mb-2">
-                          <span className="text-gray-400">Passive Income</span>
-                          <span className="text-white font-mono font-bold">৳ {Math.round(metrics.annualPassiveIncome / 12).toLocaleString()}/mo</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm mb-4">
-                          <span className="text-gray-400">Monthly Expense</span>
-                          <span className="text-white font-mono font-bold">৳ {settings.targetMonthlyExpense.toLocaleString()}</span>
-                      </div>
-                      
-                      <div className="h-4 bg-black rounded-full overflow-hidden border border-gray-800 relative">
-                          <div className="absolute top-0 left-0 h-full bg-gold z-10" style={{width: `${Math.min(100, ((metrics.annualPassiveIncome/12) / settings.targetMonthlyExpense) * 100)}%`}}></div>
-                      </div>
-                      <p className="text-center text-[10px] text-gray-500 mt-2 uppercase font-bold">Target: Passive > Expenses</p>
-                  </div>
-              </div>
-          </div>
-      );
-  };
-
-  const renderPortfolio = () => (
-      <div className="space-y-6 animate-in fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               {/* ASSETS COLUMN */}
-               <div className="space-y-4">
-                   <div className="glass-panel p-6 rounded-lg">
-                        <div className="flex justify-between items-center mb-4">
-                             <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
-                                <Crown className="text-gold"/> Assets
-                                <span className="ml-2 text-xs font-mono text-wealth-green bg-green-900/30 px-2 py-1 rounded border border-green-900">
-                                    Avg ROI: {(metrics.weightedAvgRoi).toFixed(1)}%
-                                </span>
-                             </h3>
-                             {isEditingAsset && <button onClick={() => {setIsEditingAsset(false); setAssetForm({name:'', value:'', type:'Stock', roi: ''})}} className="text-xs text-red-500 hover:text-red-400">Cancel</button>}
-                        </div>
-                        <div className="space-y-2">
-                            <input value={assetForm.name} onChange={e => setAssetForm({...assetForm, name: e.target.value})} placeholder="Asset Name" className="w-full bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-gold"/>
-                            <div className="flex gap-2">
-                                <select value={assetForm.type} onChange={e => setAssetForm({...assetForm, type: e.target.value})} className="flex-1 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none">
-                                    <option>Stock</option><option>Land</option><option>Gold</option><option>Crypto</option><option>FDR</option>
-                                </select>
-                                <input type="number" value={assetForm.value} onChange={e => setAssetForm({...assetForm, value: e.target.value})} placeholder="Value" className="flex-1 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-gold"/>
-                                <input type="number" value={assetForm.roi} onChange={e => setAssetForm({...assetForm, roi: e.target.value})} placeholder="ROI %" className="w-20 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-gold"/>
-                            </div>
-                            <button onClick={handleSaveAsset} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-2 rounded uppercase text-xs shadow-lg shadow-amber-500/20">{isEditingAsset ? "Update Asset" : "Add Asset"}</button>
-                        </div>
-                   </div>
-
-                   <div className="glass-panel rounded-lg overflow-hidden">
-                        {(data.assets || []).map(asset => (
-                            <div key={asset.id} className="p-4 flex justify-between items-center group hover:bg-white/5 border-b border-gray-800 last:border-0 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-900/20 rounded border border-green-900/50"><ArrowUpRight size={16} className="text-wealth-green"/></div>
-                                    <div>
-                                        <p className="text-white font-bold text-sm">{asset.name}</p>
-                                        <p className="text-[10px] text-gray-500 uppercase">{asset.type} • <span className="text-wealth-green">{asset.roi}% ROI</span></p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <p className="text-white font-mono font-bold">৳ {asset.value.toLocaleString()}</p>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEditAsset(asset)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14}/></button>
-                                        <button onClick={() => handleDeleteAsset(asset.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                   </div>
-               </div>
-
-               {/* LIABILITIES COLUMN */}
-               <div className="space-y-4">
-                   <div className="glass-panel p-6 rounded-lg">
-                        <div className="flex justify-between items-center mb-4">
-                             <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2"><AlertCircle className="text-spartan-red"/> Liabilities</h3>
-                             {isEditingLoan && <button onClick={() => {setIsEditingLoan(false); setLoanForm({purpose:'', amount:'', interest:'', emi:''})}} className="text-xs text-red-500 hover:text-red-400">Cancel</button>}
-                        </div>
-                        <div className="space-y-2">
-                            <input value={loanForm.purpose} onChange={e => setLoanForm({...loanForm, purpose: e.target.value})} placeholder="Loan Purpose" className="w-full bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-red-500"/>
-                            <div className="flex gap-2">
-                                <input type="number" value={loanForm.amount} onChange={e => setLoanForm({...loanForm, amount: e.target.value})} placeholder="Amount Left" className="flex-1 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-red-500"/>
-                                <input type="number" value={loanForm.interest} onChange={e => setLoanForm({...loanForm, interest: e.target.value})} placeholder="Int %" className="w-20 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-red-500"/>
-                            </div>
-                            <input type="number" value={loanForm.emi} onChange={e => setLoanForm({...loanForm, emi: e.target.value})} placeholder="Monthly EMI" className="w-full bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-red-500"/>
-                            <button onClick={handleSaveLoan} className="w-full bg-spartan-red hover:bg-red-500 text-white font-bold py-2 rounded uppercase text-xs shadow-lg shadow-red-600/20">{isEditingLoan ? "Update Liability" : "Add Liability"}</button>
-                        </div>
-                   </div>
-
-                   <div className="glass-panel rounded-lg overflow-hidden">
-                        {(data.loans || []).map(loan => (
-                            <div key={loan.id} className="p-4 flex justify-between items-center group hover:bg-white/5 border-b border-gray-800 last:border-0 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-red-900/20 rounded border border-red-900/50"><ArrowDownRight size={16} className="text-spartan-red"/></div>
-                                    <div>
-                                        <p className="text-white font-bold text-sm">{loan.purpose}</p>
-                                        <p className="text-[10px] text-gray-500 uppercase">{loan.interestRate}% Interest • EMI: {loan.monthlyEMI}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <p className="text-spartan-red font-mono font-bold">- ৳ {loan.amount.toLocaleString()}</p>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEditLoan(loan)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14}/></button>
-                                        <button onClick={() => handleDeleteLoan(loan.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        {(data.loans || []).length === 0 && <p className="text-center p-4 text-xs text-gray-500 italic">No active liabilities. Freedom is close.</p>}
-                   </div>
-               </div>
-          </div>
-      </div>
-  );
-
-  const renderFire = () => {
-    const monthlySip = parseFloat(fireInputs.monthlySip) || 0;
-    const lumpsum = parseFloat(fireInputs.lumpsum) || 0;
-    const years = parseInt(fireInputs.years) || 1;
-    const annualReturn = parseFloat(fireInputs.returnRate) || 0;
-    const annualInflation = parseFloat(fireInputs.inflation) || 0;
-    const taxRate = parseFloat(fireInputs.taxRate) || 0; // Tax input
-    const targetRealWealth = parseFloat(fireInputs.target) || 0;
-
-    const months = years * 12;
-    const monthlyReturnRate = (annualReturn / 100) / 12;
-    const monthlyTaxRate = (taxRate / 100); // Apply tax to gains
-    
-    const projectionData = [];
-    let currentNominal = 0;
-    let totalInvested = 0;
-    let totalTaxPaid = 0;
-
-    for (let m = 1; m <= months; m++) {
-        let investmentThisMonth = monthlySip;
-        if (m === 2) investmentThisMonth += lumpsum;
-
-        const opening = currentNominal;
-        const grossInterest = (opening + investmentThisMonth) * monthlyReturnRate;
-        const taxAmount = grossInterest * monthlyTaxRate; // Tax on monthly gain (simplified)
-        const netInterest = grossInterest - taxAmount;
-        
-        const closing = opening + investmentThisMonth + netInterest;
-        
-        currentNominal = closing;
-        totalInvested += investmentThisMonth;
-        totalTaxPaid += taxAmount;
-
-        const yearsPassed = m / 12;
-        const inflationFactor = Math.pow(1 + (annualInflation/100), yearsPassed);
-        const realWealth = currentNominal / inflationFactor;
-
-        if (m % 12 === 0 || m === months) {
-            projectionData.push({
-                year: (m / 12).toFixed(1),
-                month: m,
-                invested: Math.round(totalInvested),
-                nominal: Math.round(currentNominal),
-                real: Math.round(realWealth),
-                inflationFactor: inflationFactor.toFixed(2),
-                monthlyInterest: Math.round(netInterest),
-                monthlyContribution: Math.round(investmentThisMonth)
-            });
-        }
-    }
-
-    const finalNominal = currentNominal;
-    const finalReal = currentNominal / Math.pow(1 + (annualInflation/100), years);
-    const inflationLoss = finalNominal - finalReal;
-
-    return (
-    <div className="space-y-6 animate-in fade-in">
-        <div className="glass-panel p-6 rounded-lg">
-             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <div>
-                    <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
-                        <Rocket className="text-gold"/> Wealth Projection Engine
-                    </h3>
-                    <span className="text-xs font-mono text-gray-500">YEARS: {years} • TARGET: ৳{(targetRealWealth/100000).toFixed(1)}L (Real)</span>
-                </div>
-                <div className="flex bg-black p-1 rounded border border-gray-800">
-                    <button 
-                        onClick={() => setFireChartMode('WEALTH')}
-                        className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${fireChartMode === 'WEALTH' ? 'bg-slate-800 text-white shadow' : 'text-gray-500'}`}
-                    >
-                        Wealth View
-                    </button>
-                    <button 
-                        onClick={() => setFireChartMode('VELOCITY')}
-                        className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${fireChartMode === 'VELOCITY' ? 'bg-slate-800 text-white shadow' : 'text-gray-500'}`}
-                    >
-                        Velocity View
-                    </button>
-                </div>
-             </div>
-             
-             {/* INPUTS GRID */}
-             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mb-6">
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Monthly SIP</label>
-                    <input type="number" value={fireInputs.monthlySip} onChange={e => setFireInputs({...fireInputs, monthlySip: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Lumpsum (Mo 2)</label>
-                    <input type="number" value={fireInputs.lumpsum} onChange={e => setFireInputs({...fireInputs, lumpsum: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Return (%)</label>
-                    <input type="number" value={fireInputs.returnRate} onChange={e => setFireInputs({...fireInputs, returnRate: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Inflation (%)</label>
-                    <input type="number" value={fireInputs.inflation} onChange={e => setFireInputs({...fireInputs, inflation: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 text-red-400 font-bold focus:border-red-500 outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Tax Rate (%)</label>
-                    <input type="number" value={fireInputs.taxRate} onChange={e => setFireInputs({...fireInputs, taxRate: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 text-orange-400 font-bold focus:border-orange-500 outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Target (Real)</label>
-                    <input type="number" value={fireInputs.target} onChange={e => setFireInputs({...fireInputs, target: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-                 <div>
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Duration (Yrs)</label>
-                    <input type="number" value={fireInputs.years} onChange={e => setFireInputs({...fireInputs, years: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-800 font-mono focus:border-gold outline-none"/>
-                 </div>
-             </div>
-
-             {/* IMPACT SUMMARY */}
-             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                 <div className="bg-black border border-gray-800 p-3 rounded">
-                     <p className="text-[10px] text-gray-500 uppercase font-bold">Projected Wealth (Real)</p>
-                     <p className="text-lg font-mono font-bold text-wealth-green">৳ {(finalReal/100000).toFixed(2)}L</p>
-                 </div>
-                 <div className="bg-black border border-gray-800 p-3 rounded">
-                     <p className="text-[10px] text-gray-500 uppercase font-bold">Nominal Value (Bank)</p>
-                     <p className="text-lg font-mono font-bold text-amber-500">৳ {(finalNominal/100000).toFixed(2)}L</p>
-                 </div>
-                 <div className="bg-black border border-gray-800 p-3 rounded">
-                     <p className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1"><TrendingDown size={10} className="text-red-500"/> Inflation Loss</p>
-                     <p className="text-lg font-mono font-bold text-red-500">-৳ {(inflationLoss/100000).toFixed(2)}L</p>
-                 </div>
-                 <div className="bg-black border border-gray-800 p-3 rounded">
-                     <p className="text-[10px] text-gray-500 uppercase font-bold flex items-center gap-1"><Percent size={10} className="text-orange-500"/> Est. Tax Paid</p>
-                     <p className="text-lg font-mono font-bold text-orange-500">-৳ {(totalTaxPaid/100000).toFixed(2)}L</p>
-                 </div>
-             </div>
-
-             {/* CHART SECTION */}
-             <div className="bg-black border border-gray-800 p-4 rounded-lg h-72 mb-6">
-                <ResponsiveContainer width="100%" height="100%">
-                    {fireChartMode === 'WEALTH' ? (
-                        <AreaChart data={projectionData}>
-                            <defs>
-                                <linearGradient id="colorNominal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
-                                </linearGradient>
-                                <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <XAxis dataKey="year" stroke="#94a3b8" tick={{fontSize: 10}} label={{ value: 'Years', position: 'insideBottomRight', offset: -5 }}/>
-                            <YAxis stroke="#94a3b8" tick={{fontSize: 10}} tickFormatter={v => `${(v/100000).toFixed(0)}L`}/>
-                            <Tooltip contentStyle={{backgroundColor: '#000', borderColor: '#333', borderRadius: '8px'}} formatter={(v: number) => `৳ ${v.toLocaleString()}`}/>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#444"/>
-                            <ReferenceLine y={targetRealWealth} label="Target Real" stroke="red" strokeDasharray="3 3" />
-                            
-                            <Area type="monotone" dataKey="nominal" stroke="#F59E0B" fillOpacity={1} fill="url(#colorNominal)" name="Nominal Wealth (Bank Balance)" animationDuration={1500}/>
-                            <Area type="monotone" dataKey="real" stroke="#10B981" fillOpacity={1} fill="url(#colorReal)" name="Real Wealth (Purchasing Power)" animationDuration={1500}/>
-                            <Legend />
-                        </AreaChart>
-                    ) : (
-                        <BarChart data={projectionData}>
-                            <XAxis dataKey="year" stroke="#94a3b8" tick={{fontSize: 10}} />
-                            <YAxis stroke="#94a3b8" tick={{fontSize: 10}} tickFormatter={v => `৳${v}`} />
-                            <Tooltip contentStyle={{backgroundColor: '#000', borderColor: '#333', borderRadius: '8px'}} formatter={(v: number) => `৳ ${v.toLocaleString()}`}/>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#444"/>
-                            <Legend />
-                            <Bar dataKey="monthlyContribution" name="Monthly Investment" fill="#3B82F6" stackId="a" animationDuration={1500} />
-                            <Bar dataKey="monthlyInterest" name="Monthly Growth (Post-Tax)" fill="#10B981" stackId="a" animationDuration={1500} />
-                        </BarChart>
-                    )}
-                </ResponsiveContainer>
-             </div>
-        </div>
-    </div>
-  )};
-
-  const renderOffense = () => (
-    <div className="space-y-6 animate-in fade-in">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* BUSINESS FORM */}
-            <div className="glass-panel p-6 rounded-lg">
-                <div className="flex justify-between items-center mb-4">
-                     <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
-                        <Building2 className="text-blue-500"/> Business Builder
-                     </h3>
-                     {isEditingBiz && <button onClick={() => {setIsEditingBiz(false); setBizForm({name:'', revenue:'', valuation:'', stage:1})}} className="text-xs text-red-500">Cancel</button>}
-                </div>
-                
-                <div className="space-y-3">
-                    <input value={bizForm.name} onChange={e => setBizForm({...bizForm, name: e.target.value})} placeholder="Venture Name" className="w-full bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
-                    <div className="flex gap-2">
-                        <input type="number" value={bizForm.revenue} onChange={e => setBizForm({...bizForm, revenue: e.target.value})} placeholder="Monthly Rev" className="w-1/2 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
-                        <input type="number" value={bizForm.valuation} onChange={e => setBizForm({...bizForm, valuation: e.target.value})} placeholder="Valuation" className="w-1/2 bg-black border border-gray-700 text-white text-sm p-3 rounded outline-none focus:border-blue-500"/>
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-gray-500 uppercase mb-1">Growth Stage</p>
-                        <div className="flex gap-1">
-                            {[1,2,3,4,5].map(s => (
-                                <button key={s} onClick={() => setBizForm({...bizForm, stage: s})} className={`flex-1 py-2 text-xs font-bold rounded border ${bizForm.stage === s ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-800 text-gray-500 hover:bg-gray-800'}`}>{s}</button>
-                            ))}
-                        </div>
-                    </div>
-                    <button onClick={handleSaveBusiness} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded text-xs uppercase tracking-widest mt-2 shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">
-                        {isEditingBiz ? "Update Venture" : "Launch Venture"}
-                    </button>
-                </div>
-            </div>
-
-            {/* VENTURE LIST */}
-            <div className="space-y-3">
-                {(data.businesses || []).map(biz => (
-                    <div key={biz.id} className="bg-black border border-gray-800 p-4 rounded-lg group relative hover:border-blue-500 transition-all hover:-translate-y-1">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h4 className="font-bold text-white text-lg">{biz.name}</h4>
-                                <p className="text-xs text-blue-500 uppercase font-bold">Stage {biz.stage}: {BUSINESS_STAGES[biz.stage-1]?.goal}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-xl font-mono text-white font-bold">৳ {biz.valuation.toLocaleString()}</p>
-                                <p className="text-[10px] text-gray-500 uppercase">Valuation</p>
-                            </div>
-                        </div>
-                        <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between items-center">
-                            <p className="text-xs text-gray-500">Monthly Rev: <span className="text-wealth-green font-mono">৳ {biz.monthlyRevenue.toLocaleString()}</span></p>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => startEditBusiness(biz)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14}/></button>
-                                <button onClick={() => handleDeleteBusiness(biz.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                {(data.businesses || []).length === 0 && (
-                    <div className="h-full flex items-center justify-center border border-dashed border-gray-800 rounded-lg text-gray-500 text-xs italic">
-                        No active ventures. Start building.
-                    </div>
-                )}
-            </div>
-        </div>
-    </div>
-  );
-
-  const renderAudit = () => {
-    const snapshots = [...(data.budgetSnapshots || [])].sort((a,b) => b.month.localeCompare(a.month));
-    const sortedSnapshots = [...(data.budgetSnapshots || [])].sort((a, b) => a.month.localeCompare(b.month));
-    const auditChartData = sortedSnapshots.map(s => ({
-        month: s.month,
-        income: s.income,
-        expense: s.essentialExpenses + s.nonEssentialExpenses,
-        savings: s.income - (s.essentialExpenses + s.nonEssentialExpenses)
-    }));
-
-    return (
-    <div className="space-y-6 animate-in fade-in">
-        {/* INPUT FORM */}
-        <div className="glass-panel p-6 rounded-lg">
-            <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
-                    <ClipboardList className="text-blue-500"/> Monthly Audit Record
-                 </h3>
-                 {isEditingSnapshot && <button onClick={() => {setIsEditingSnapshot(false); setSnapshotForm({month: new Date().toISOString().slice(0, 7), income: '', dependents: '0', essential: '', nonEssential: '', notes: ''})}} className="text-xs text-red-500">Cancel</button>}
-            </div>
-
-            <div className="space-y-4">
-                <div className="flex gap-4">
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Month</label>
-                        <input type="month" value={snapshotForm.month} onChange={e => setSnapshotForm({...snapshotForm, month: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Income</label>
-                        <input type="number" value={snapshotForm.income} onChange={e => setSnapshotForm({...snapshotForm, income: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Dependents</label>
-                        <input type="number" value={snapshotForm.dependents} onChange={e => setSnapshotForm({...snapshotForm, dependents: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                </div>
-                <div className="flex gap-4">
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Essential Exp</label>
-                        <input type="number" value={snapshotForm.essential} onChange={e => setSnapshotForm({...snapshotForm, essential: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Non-Essential Exp</label>
-                        <input type="number" value={snapshotForm.nonEssential} onChange={e => setSnapshotForm({...snapshotForm, nonEssential: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 uppercase font-bold">Notes</label>
-                        <input type="text" value={snapshotForm.notes} onChange={e => setSnapshotForm({...snapshotForm, notes: e.target.value})} className="w-full bg-black text-white p-2 rounded mt-1 border border-gray-700 outline-none focus:border-blue-500"/>
-                     </div>
-                </div>
-                <button onClick={handleSaveSnapshot} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">
-                    {isEditingSnapshot ? "Update Snapshot" : "Log Month"}
-                </button>
-            </div>
-        </div>
-
-        {/* AUDIT TABLE */}
-        <div className="glass-panel rounded-lg overflow-hidden">
-             <div className="p-4 border-b border-gray-800">
-                <h3 className="text-sm font-bold text-white uppercase">Historical Performance</h3>
-             </div>
-             <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-gray-400">
-                    <thead className="bg-black text-gray-500 uppercase font-bold">
-                        <tr>
-                            <th className="p-3">Month</th>
-                            <th className="p-3 text-right">Income</th>
-                            <th className="p-3 text-center">People</th>
-                            <th className="p-3 text-right">PPI / Class</th>
-                            <th className="p-3 text-right">Expenses</th>
-                            <th className="p-3 text-right">Savings</th>
-                            <th className="p-3">Notes</th>
-                            <th className="p-3 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                        {snapshots.map((s, index) => {
-                            const totalPeople = (s.dependents || 0) + 1;
-                            const ppi = s.income / totalPeople;
-                            const totalExp = (s.essentialExpenses || 0) + (s.nonEssentialExpenses || 0);
-                            const savings = s.income - totalExp;
-                            const financialClass = getFinancialClass(ppi);
-                            const prev = snapshots[index + 1];
-                            const incomeTrend = prev ? (s.income >= prev.income ? 'UP' : 'DOWN') : 'FLAT';
-                            const expenseTrend = prev ? ((totalExp <= (prev.essentialExpenses + prev.nonEssentialExpenses)) ? 'BETTER' : 'WORSE') : 'FLAT';
-                            const savingsTrend = prev ? (savings >= (prev.income - (prev.essentialExpenses + prev.nonEssentialExpenses)) ? 'UP' : 'DOWN') : 'FLAT';
-
-                            return (
-                            <tr key={s.id} className="hover:bg-slate-900/50 group transition-colors">
-                                <td className="p-3 font-mono text-white">{s.month}</td>
-                                <td className="p-3 text-right font-mono text-white">
-                                    <div className="flex items-center justify-end gap-1">
-                                        {incomeTrend === 'UP' && <TrendingUp size={12} className="text-green-500"/>}
-                                        {incomeTrend === 'DOWN' && <TrendingDown size={12} className="text-red-500"/>}
-                                        {s.income.toLocaleString()}
-                                    </div>
-                                </td>
-                                <td className="p-3 text-center">{totalPeople}</td>
-                                <td className="p-3 text-right">
-                                    <div className="flex flex-col items-end">
-                                        <span className="font-mono text-white">৳ {Math.round(ppi).toLocaleString()}</span>
-                                        <span className={`text-[9px] uppercase font-bold ${financialClass.color}`}>{financialClass.label}</span>
-                                    </div>
-                                </td>
-                                <td className="p-3 text-right font-mono">
-                                    <div className="flex items-center justify-end gap-1">
-                                        {expenseTrend === 'BETTER' && <TrendingDown size={12} className="text-green-500"/>}
-                                        {expenseTrend === 'WORSE' && <TrendingUp size={12} className="text-red-500"/>}
-                                        {totalExp.toLocaleString()}
-                                    </div>
-                                    <span className="text-[9px] text-gray-500 block">{s.essentialExpenses} Ess • {s.nonEssentialExpenses} Non</span>
-                                </td>
-                                <td className={`p-3 text-right font-mono font-bold ${savings > 0 ? 'text-wealth-green' : 'text-red-500'}`}>
-                                    <div className="flex items-center justify-end gap-1">
-                                         {savingsTrend === 'UP' && <TrendingUp size={12} className="text-green-500"/>}
-                                         {savingsTrend === 'DOWN' && <TrendingDown size={12} className="text-red-500"/>}
-                                         {savings.toLocaleString()}
-                                    </div>
-                                </td>
-                                <td className="p-3 truncate max-w-[150px]">{s.notes}</td>
-                                <td className="p-3 text-right">
-                                    <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEditSnapshot(s)} className="text-blue-500 hover:text-blue-400"><Edit3 size={14}/></button>
-                                        <button onClick={() => handleDeleteSnapshot(s.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        )})}
-                        {snapshots.length === 0 && <tr className="text-center"><td colSpan={8} className="p-6 italic">No monthly audits found.</td></tr>}
-                    </tbody>
-                </table>
-             </div>
-        </div>
-    </div>
-  )};
-
-  const renderBlueprint = () => (
-    <div className="space-y-6 animate-in fade-in">
-        {/* HERO CARD */}
-        <div className="bg-gradient-to-r from-slate-900 to-emerald-950 border border-wealth-green/30 p-8 rounded-lg relative overflow-hidden shadow-lg hover:shadow-emerald-900/20 transition-shadow">
-            <div className="relative z-10">
-                <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-2">Wealth Building Blueprint</h2>
-                <p className="text-sm font-mono text-emerald-400">STRATEGY • MINDSET • EXECUTION</p>
-                <div className="mt-6 flex flex-col md:flex-row gap-6">
-                    <div className="bg-black/50 p-4 rounded border border-gray-700">
-                        <p className="text-xs text-gray-500 uppercase font-bold mb-1">Concept: Asset (সম্পদ)</p>
-                        <p className="text-sm text-gray-200">Assets put money in your pocket. Examples: Cash, Land, Gold, Stocks.</p>
-                    </div>
-                    <div className="bg-black/50 p-4 rounded border border-gray-700">
-                        <p className="text-xs text-gray-500 uppercase font-bold mb-1">Concept: Net Worth (নেট ওয়ার্থ)</p>
-                        <p className="text-sm text-gray-200">Total Assets - Total Liabilities. Focus on growing this, not just income.</p>
-                    </div>
-                </div>
-            </div>
-            <Crown size={200} className="absolute -bottom-10 -right-10 text-wealth-green/5 opacity-50 pointer-events-none"/>
-        </div>
-
-        {/* 2. WEALTH TIMELINE & 7 SECRETS */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="glass-panel p-6 rounded-lg shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                    <Target className="text-gold" />
-                    <h3 className="font-bold text-white uppercase">Wealth Timeline</h3>
-                </div>
-                <div className="space-y-4">
-                    {WEALTH_TIMELINE.map((t, i) => (
-                        <div key={i} className="flex gap-4 group">
-                            <div className="w-16 text-right font-mono text-gold font-bold group-hover:scale-110 transition-transform">{t.age}</div>
-                            <div className="flex-1 pb-4 border-l border-gray-700 pl-4 relative">
-                                <div className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-gold group-hover:shadow-[0_0_10px_#FFD700] transition-shadow"></div>
-                                <p className="text-white font-bold text-xs uppercase mb-1">{t.focus}</p>
-                                <p className="text-gray-400 text-sm leading-snug">{t.action}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <div className="glass-panel p-6 rounded-lg shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                    <Lock className="text-blue-500" />
-                    <h3 className="font-bold text-white uppercase">7 Secrets of the Rich</h3>
-                </div>
-                <ul className="space-y-3">
-                    {SECRETS_OF_RICH_7.map((s, i) => (
-                        <li key={i} className="text-sm text-gray-300 flex items-start gap-2 hover:bg-white/5 p-2 rounded transition-colors">
-                            <CheckCircle size={14} className="text-blue-500 mt-0.5 flex-shrink-0"/>
-                            <span>{s}</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
-    </div>
-  );
-
-  const renderJournal = () => (
-      <div className="space-y-6 animate-in fade-in">
-          {/* REALITY CHECKLIST BOARD */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              
-              {/* 1. MONTHLY COMMITMENTS */}
-              <div className="glass-panel p-6 rounded-lg border border-wealth-green/30">
-                  <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                          <PiggyBank className="text-wealth-green"/>
-                          <h3 className="text-lg font-bold text-white uppercase">Monthly Commitments</h3>
-                      </div>
-                      <button onClick={() => toggleAddForm('commitments')} className="text-gray-500 hover:text-white"><Plus size={16}/></button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                      {journalData.commitments.map(c => (
-                          <div key={c.id} className="flex justify-between items-center p-3 bg-black/40 rounded border border-gray-800 group hover:border-gray-600 transition-colors">
-                              <div>
-                                  <p className="text-sm font-bold text-gray-200">{c.name}</p>
-                                  <p className="text-[10px] text-gray-500">{c.details}</p>
-                              </div>
-                              <div className="flex gap-2 items-center">
-                                <button onClick={() => deleteCommitment(c.id)} className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>
-                                <button onClick={() => toggleCommitment(c.id)} className={`p-1.5 rounded ${c.completed ? 'bg-wealth-green text-black' : 'bg-gray-800 text-gray-500'}`}>
-                                    {c.completed ? <CheckCircle size={16}/> : <X size={16}/>}
-                                </button>
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-
-                  {showAddForms['commitments'] && (
-                      <div className="mt-4 p-3 bg-black/60 rounded border border-gray-700 animate-in fade-in">
-                          <input placeholder="Name (e.g. IDLC)" value={newCommitment.name} onChange={e => setNewCommitment({...newCommitment, name: e.target.value})} className="w-full bg-slate-900 border border-gray-700 rounded p-1 text-xs text-white mb-2"/>
-                          <input placeholder="Details (e.g. 500 BDT)" value={newCommitment.details} onChange={e => setNewCommitment({...newCommitment, details: e.target.value})} className="w-full bg-slate-900 border border-gray-700 rounded p-1 text-xs text-white mb-2"/>
-                          <button onClick={addCommitment} className="w-full bg-wealth-green text-black text-xs font-bold py-1 rounded">Add Commitment</button>
-                      </div>
-                  )}
-                  <p className="text-[10px] text-gray-500 mt-4 italic text-center">"Important not add every month - Auto Execute"</p>
-              </div>
-
-              {/* 2. RECEIVABLES & DAILY DISCIPLINE */}
-              <div className="glass-panel p-6 rounded-lg border border-blue-500/30">
-                  <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                          <ClipboardList className="text-blue-500"/>
-                          <h3 className="text-lg font-bold text-white uppercase">Daily Protocol</h3>
-                      </div>
-                      <button onClick={() => toggleAddForm('protocol')} className="text-gray-500 hover:text-white"><Plus size={16}/></button>
-                  </div>
-                  
-                  {/* Daily Habits */}
-                  <div className="space-y-3 mb-6">
-                      {journalData.dailyProtocol.map((p, idx) => (
-                          <div key={p.id} className="flex justify-between items-center group">
-                              <div onClick={() => toggleProtocol(p.id)} className={`flex-1 flex items-center gap-3 p-2 rounded cursor-pointer select-none transition-colors ${p.completed ? 'bg-blue-900/20 text-blue-300' : 'hover:bg-white/5 text-gray-400'}`}>
-                                  {p.completed ? <CheckCircle size={16}/> : <div className="w-4 h-4 rounded-full border border-gray-600"></div>}
-                                  <span className="text-xs font-bold uppercase">{idx + 1}. {p.task}</span>
-                              </div>
-                              <button onClick={() => deleteProtocol(p.id)} className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 px-2"><Trash2 size={12}/></button>
-                          </div>
-                      ))}
-                  </div>
-
-                  {showAddForms['protocol'] && (
-                      <div className="mb-4 flex gap-2">
-                          <input placeholder="New Task..." value={newProtocol} onChange={e => setNewProtocol(e.target.value)} className="flex-1 bg-slate-900 border border-gray-700 rounded p-1 text-xs text-white"/>
-                          <button onClick={addProtocol} className="bg-blue-600 text-white px-2 rounded"><Plus size={14}/></button>
-                      </div>
-                  )}
-
-                  <div className="border-t border-gray-700 pt-4">
-                      <div className="flex justify-between items-center mb-2">
-                          <p className="text-[10px] text-gray-500 uppercase font-bold">Receivables</p>
-                          <button onClick={() => toggleAddForm('receivables')} className="text-gray-500 hover:text-white"><Plus size={12}/></button>
-                      </div>
-                      <div className="space-y-2">
-                          {journalData.receivables.map(r => (
-                              <div key={r.id} className="flex justify-between items-center p-2 bg-red-900/10 border border-red-900/30 rounded group">
-                                  <span className="text-xs text-gray-300">{r.name}</span>
-                                  <div className="flex gap-2 items-center">
-                                      <button onClick={() => deleteReceivable(r.id)} className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={12}/></button>
-                                      <button onClick={() => toggleReceivable(r.id)} className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${r.status === 'RECEIVED' ? 'bg-green-600 text-white' : 'bg-red-900 text-red-200'}`}>
-                                          {r.status}
-                                      </button>
-                                  </div>
-                              </div>
-                          ))}
-                      </div>
-                      {showAddForms['receivables'] && (
-                          <div className="mt-2 flex gap-2">
-                              <input placeholder="Name..." value={newReceivable} onChange={e => setNewReceivable(e.target.value)} className="flex-1 bg-slate-900 border border-gray-700 rounded p-1 text-xs text-white"/>
-                              <button onClick={addReceivable} className="bg-red-600 text-white px-2 rounded"><Plus size={14}/></button>
-                          </div>
-                      )}
-                  </div>
-              </div>
-
-              {/* 3. WEALTH RULES CARD */}
-              <div className="glass-panel p-6 rounded-lg border border-gold/30 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Scale size={100} className="text-gold"/></div>
-                  <div className="relative z-10">
-                      <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-lg font-bold text-white uppercase flex items-center gap-2"><Crown className="text-gold"/> Core Directive</h3>
-                          <button onClick={() => toggleAddForm('directives')} className="text-gray-500 hover:text-white"><Plus size={16}/></button>
-                      </div>
-                      
-                      <ul className="space-y-4">
-                          {journalData.directives.map((d, idx) => (
-                              <li key={d.id} className="flex gap-3 group relative">
-                                  <div className={`min-w-[4px] h-full rounded-full ${idx % 2 === 0 ? 'bg-gold' : 'bg-gray-500'}`}></div>
-                                  <div>
-                                      <p className={`text-sm font-bold uppercase ${idx % 2 === 0 ? 'text-gold' : 'text-gray-300'}`}>{idx + 1}. {d.title}</p>
-                                      <p className="text-[10px] text-gray-400">{d.desc}</p>
-                                  </div>
-                                  <button onClick={() => deleteDirective(d.id)} className="absolute top-0 right-0 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={12}/></button>
-                              </li>
-                          ))}
-                      </ul>
-
-                      {showAddForms['directives'] && (
-                          <div className="mt-4 p-3 bg-black/60 rounded border border-gray-700 animate-in fade-in">
-                              <input placeholder="Title..." value={newDirective.title} onChange={e => setNewDirective({...newDirective, title: e.target.value})} className="w-full bg-slate-900 border border-gray-700 rounded p-1 text-xs text-white mb-2"/>
-                              <textarea placeholder="Description..." value={newDirective.desc} onChange={e => setNewDirective({...newDirective, desc: e.target.value})} className="w-full bg-slate-900 border border-gray-700 rounded p-1 text-xs text-white mb-2 h-16"/>
-                              <button onClick={addDirective} className="w-full bg-gold text-black text-xs font-bold py-1 rounded">Add Rule</button>
-                          </div>
-                      )}
-                  </div>
-              </div>
-          </div>
-
-          {/* GUILT FREE VAULT TRACKER */}
-          <div className="glass-panel p-6 rounded-lg relative overflow-hidden">
-              <div className="flex justify-between items-center mb-4 relative z-10">
-                  <h3 className="text-xl font-bold text-white uppercase flex items-center gap-2">
-                      <Wallet className="text-pink-500" /> Guilt-Free Vault
-                  </h3>
-                  <span className="text-[10px] bg-pink-900/20 text-pink-400 px-2 py-1 rounded border border-pink-900 font-bold">10% OF INCOME</span>
-              </div>
-              
-              <div className="relative z-10">
-                  <div className="flex justify-between text-xs text-gray-400 mb-2">
-                      <span>Spent on Self-Care: <span className="text-white font-mono font-bold">৳ {metrics.totalGuiltFreeSpent.toLocaleString()}</span></span>
-                      <span>Budget: <span className="text-pink-500 font-mono font-bold">৳ {metrics.guiltFreeBudget.toLocaleString()}</span></span>
-                  </div>
-                  <div className="h-4 bg-gray-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-pink-500 transition-all duration-1000 shadow-[0_0_10px_#ec4899] ease-out" 
-                        style={{width: `${Math.min(100, (metrics.totalGuiltFreeSpent / (metrics.guiltFreeBudget || 1)) * 100)}%`}}
-                      ></div>
-                  </div>
-                  <p className="text-[10px] text-gray-500 mt-2">
-                      Treat yourself. You are the farmer, your body/mind is the horse. Keep the horse happy.
-                  </p>
-              </div>
-              <Wallet size={150} className="absolute -bottom-10 -right-10 text-pink-500/10 opacity-50 pointer-events-none"/>
-          </div>
-
-          {/* PATTERN RECOGNITION LOG */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Input Form */}
-              <div className="lg:col-span-1 glass-panel p-6 rounded-lg h-fit">
-                  <h3 className="text-sm font-bold text-gray-300 uppercase mb-4 flex items-center gap-2">
-                      <Brain size={16}/> Log Mental Pattern
-                  </h3>
-                  <div className="space-y-3">
-                      <div>
-                          <label className="text-[10px] text-gray-500 uppercase font-bold">Date</label>
-                          <input type="date" value={journalForm.date} onChange={e => setJournalForm({...journalForm, date: e.target.value})} className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs outline-none focus:border-blue-500"/>
-                      </div>
-                      <div>
-                          <label className="text-[10px] text-gray-500 uppercase font-bold">Pattern / Problem</label>
-                          <input placeholder="e.g., Impulse Buy, Fear" value={journalForm.patternProblem} onChange={e => setJournalForm({...journalForm, patternProblem: e.target.value})} className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs outline-none focus:border-blue-500"/>
-                      </div>
-                      <div>
-                          <label className="text-[10px] text-gray-500 uppercase font-bold">Identify Trigger</label>
-                          <input placeholder="Why? (e.g. Saw friend buy it)" value={journalForm.identifyTrigger} onChange={e => setJournalForm({...journalForm, identifyTrigger: e.target.value})} className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs outline-none focus:border-blue-500"/>
-                      </div>
-                      <div>
-                          <label className="text-[10px] text-gray-500 uppercase font-bold">Solve Action</label>
-                          <input placeholder="What did you do?" value={journalForm.solveAction} onChange={e => setJournalForm({...journalForm, solveAction: e.target.value})} className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs outline-none focus:border-blue-500"/>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                          <div>
-                              <label className="text-[10px] text-pink-500 uppercase font-bold">Guilt-Free Spent</label>
-                              <input type="number" placeholder="0" value={journalForm.guiltFreeSpent} onChange={e => setJournalForm({...journalForm, guiltFreeSpent: parseFloat(e.target.value) || 0})} className="w-full bg-black border border-pink-900/50 rounded p-2 text-white text-xs outline-none focus:border-pink-500"/>
-                          </div>
-                      </div>
-                      <button onClick={handleSaveJournal} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded uppercase text-xs mt-2 transition-transform active:scale-95">Log Pattern</button>
-                  </div>
-              </div>
-
-              {/* Log List */}
-              <div className="lg:col-span-2 bg-black border border-gray-800 rounded-lg overflow-hidden">
-                  <div className="p-4 border-b border-gray-800 bg-slate-900/50">
-                      <h3 className="text-sm font-bold text-white uppercase">Behavioral Finance Log</h3>
-                  </div>
-                  <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
-                      <table className="w-full text-left text-xs text-gray-400">
-                          <thead className="bg-slate-900 text-gray-500 uppercase font-bold sticky top-0 shadow-sm">
-                              <tr>
-                                  <th className="p-3">Date</th>
-                                  <th className="p-3">Pattern</th>
-                                  <th className="p-3">Trigger</th>
-                                  <th className="p-3">Action</th>
-                                  <th className="p-3 text-right text-pink-500">Self-Care</th>
-                                  <th className="p-3 text-right"></th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-800">
-                              {(data.mindsetLogs || []).map((log) => (
-                                  <tr key={log.id} className="hover:bg-slate-900/30 group">
-                                      <td className="p-3 font-mono">{log.date}</td>
-                                      <td className="p-3 font-bold text-red-400">{log.patternProblem}</td>
-                                      <td className="p-3">{log.identifyTrigger}</td>
-                                      <td className="p-3 text-green-400">{log.solveAction}</td>
-                                      <td className="p-3 text-right font-mono text-pink-500 font-bold">{log.guiltFreeSpent > 0 ? `৳ ${log.guiltFreeSpent}` : '-'}</td>
-                                      <td className="p-3 text-right">
-                                          <button onClick={() => handleDeleteJournal(log.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={12}/></button>
-                                      </td>
-                                  </tr>
-                              ))}
-                              {(data.mindsetLogs || []).length === 0 && (
-                                  <tr><td colSpan={6} className="p-6 text-center italic text-gray-600">No patterns logged yet. Observe your mind.</td></tr>
-                              )}
-                          </tbody>
-                      </table>
-                  </div>
-              </div>
-          </div>
-      </div>
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20 relative">
-      
-      {/* HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-800 pb-4 gap-4">
+    <div className="space-y-10 animate-in fade-in duration-700 pb-20 max-w-7xl mx-auto">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-800/50 pb-6 gap-6">
         <div>
-           <h2 className="text-3xl font-black text-wealth-green uppercase tracking-tighter flex items-center gap-3">
-             <Landmark size={32} /> Wealth Fortress <span className="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded border border-gray-800 align-middle ml-2">TITANIUM</span>
+           <h2 className="text-4xl font-display font-black text-white uppercase tracking-tighter flex items-center gap-4 group">
+             <div className="p-2 bg-wealth-green text-black rounded-lg shadow-[0_0_20px_rgba(0,230,118,0.4)]"><Landmark size={32} /></div>
+             Wealth <span className="text-wealth-green text-glow-green">Fortress</span>
            </h2>
-           <p className="text-xs text-gray-400 font-mono mt-1">EXPERT LEDGER • REAL-TIME INFLATION {INFLATION_RATE_BD * 100}% • AUTO-DISTRIBUTION ONLINE</p>
+           <p className="text-xs text-gray-500 font-mono mt-2 uppercase tracking-[0.4em] font-black italic">Billionaire Engine Architecture • Optimized for Sovereignty</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
             {[
-                {id: 'COMMAND', icon: LayoutDashboard, label: 'Command'},
-                {id: 'ROADMAP', icon: Map, label: 'Roadmap (NEW)'}, 
-                {id: 'JOURNAL', icon: Brain, label: 'Journal'}, 
-                {id: 'BLUEPRINT', icon: BookOpen, label: 'Blueprint'},
-                {id: 'FIRE', icon: Rocket, label: 'Projection'},
-                {id: 'OFFENSE', icon: Building2, label: 'Business'},
-                {id: 'PORTFOLIO', icon: Crown, label: 'Assets'},
-                {id: 'AUDIT', icon: FileText, label: 'Audit'},
+                {id: 'ENGINE', icon: Zap, label: 'Billionaire Engine'}, 
+                {id: 'COMMAND', icon: LayoutDashboard, label: 'Audit Hub'},
+                {id: 'STRATEGY', icon: Binary, label: 'Efficiency Layers'},
             ].map((tab) => (
                 <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded text-xs font-bold uppercase transition-all active:scale-95 ${
+                    className={`flex items-center gap-3 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all tracking-widest border ${
                         activeTab === tab.id 
-                        ? 'bg-amber-400 text-black shadow-[0_0_15px_#FBBF24]' 
-                        : 'bg-slate-900 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-400'
+                        ? 'bg-amber-400 text-black shadow-[0_0_30px_rgba(251,191,36,0.3)] border-amber-300 scale-105' 
+                        : 'bg-slate-900/50 border-gray-800 text-gray-500 hover:text-white'
                     }`}
                 >
-                    <tab.icon size={14} /> {tab.label}
+                    <tab.icon size={16} /> {tab.label}
                 </button>
             ))}
         </div>
       </header>
 
-      {activeTab === 'COMMAND' && renderCommandCenter()}
-      {activeTab === 'ROADMAP' && renderRoadmap()}
-      {activeTab === 'BLUEPRINT' && renderBlueprint()}
-      {activeTab === 'OFFENSE' && renderOffense()}
-      {activeTab === 'PORTFOLIO' && renderPortfolio()}
-      {activeTab === 'AUDIT' && renderAudit()}
-      {activeTab === 'FIRE' && renderFire()}
-      {activeTab === 'JOURNAL' && renderJournal()}
-
+      {activeTab === 'ENGINE' && renderEngine()}
+      {activeTab === 'COMMAND' && renderCommand()}
+      {activeTab === 'STRATEGY' && (
+          <div className="space-y-6 animate-in fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="glass-panel p-8 rounded-[2rem] border border-white/5 relative overflow-hidden group">
+                      <h3 className="text-xl font-display font-black text-white uppercase mb-6 flex items-center gap-3"><ShieldCheck className="text-wealth-green" /> The Tax Shield</h3>
+                      <div className="space-y-4">
+                          <div className="bg-black/40 p-5 rounded-2xl border border-white/5 hover:border-wealth-green/30 transition-colors">
+                              <p className="text-[10px] text-wealth-green font-black uppercase mb-1">Harvesting Protocol</p>
+                              <p className="text-sm text-gray-300">Offset share profits with losses before year-end to minimize taxable gains.</p>
+                          </div>
+                          <div className="bg-black/40 p-5 rounded-2xl border border-white/5 hover:border-wealth-green/30 transition-colors">
+                              <p className="text-[10px] text-wealth-green font-black uppercase mb-1">ELSS & PPF Vectors</p>
+                              <p className="text-sm text-gray-300">Utilize Layer 1 for compounded zero-tax growth vehicles.</p>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="glass-panel p-8 rounded-[2rem] border border-white/5 relative overflow-hidden group">
+                      <h3 className="text-xl font-display font-black text-white uppercase mb-6 flex items-center gap-3"><Wind className="text-blue-500" /> Freedom Flywheel</h3>
+                      <div className="space-y-4">
+                          <div className="bg-black/40 p-5 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-colors">
+                              <p className="text-[10px] text-blue-400 font-black uppercase mb-1">Sovereignty Target</p>
+                              <p className="text-2xl font-mono font-black text-white">৳ {metrics.passiveIncomeMo.toFixed(0)} <span className="text-xs text-gray-500 font-bold uppercase">/ Mo</span></p>
+                              <div className="h-2.5 bg-gray-900 rounded-full overflow-hidden mt-3 relative">
+                                  <div className="h-full bg-blue-500 shadow-[0_0_10px_#2979FF]" style={{width: `${Math.min(100, metrics.freedomRatio)}%`}}></div>
+                              </div>
+                              <p className="text-[9px] text-gray-600 mt-2 uppercase font-bold tracking-widest">{metrics.freedomRatio.toFixed(1)}% TO SOVEREIGNTY DAY</p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };
