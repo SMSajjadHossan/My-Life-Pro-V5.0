@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Habit, UserProfile, SpartanDayPlan } from '../types';
+import { Habit, UserProfile, SpartanDayPlan, JournalTask } from '../types';
 import { 
   RETENTION_PHASES, 
   SPARTAN_MASTER_CYCLE, 
@@ -12,7 +12,7 @@ import {
 import { 
   Skull, Zap, Activity, Dna, Flame, Utensils, 
   Dumbbell, ShieldAlert, CheckCircle2, Circle, Clock, 
-  Wind, Moon, Sun, Brain, Heart, ChevronRight, Info, Scale, Ruler, TrendingUp, Calendar, Bell
+  Wind, Moon, Sun, Brain, Heart, ChevronRight, Info, Scale, Ruler, TrendingUp, Target, Calendar, Plus
 } from 'lucide-react';
 
 interface Props {
@@ -21,16 +21,26 @@ interface Props {
   toggleHabit: (id: string) => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
   setHabits: (habits: Habit[]) => void;
+  objectives: JournalTask[];
+  setObjectives: (objs: JournalTask[]) => void;
 }
 
-export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, updateProfile, setHabits }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'AUDIT' | 'HISTORY' | 'KNOWLEDGE'>('OVERVIEW');
+export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, updateProfile, setHabits, objectives, setObjectives }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'AUDIT' | 'MISSIONS' | 'KNOWLEDGE'>('OVERVIEW');
   const [currentTime, setCurrentTime] = useState(new Date());
   
   const [vitalForm, setVitalForm] = useState({
       weight: profile.weight?.toString() || '',
       bodyFat: profile.bodyFat?.toString() || '',
       sleepHours: profile.sleepHours?.toString() || ''
+  });
+
+  const [goalForm, setGoalForm] = useState({
+      name: '',
+      startDate: '',
+      targetDate: '',
+      priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Critical',
+      notes: ''
   });
 
   const [reminderEditHabit, setReminderEditHabit] = useState<string | null>(null);
@@ -88,21 +98,33 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
       setActiveSubTab('OVERVIEW');
   };
 
+  const handleGoalSubmit = () => {
+      if (!goalForm.name || !goalForm.targetDate) {
+          alert("MISSION FAILURE: Directive Name and Target Date are non-negotiable.");
+          return;
+      }
+
+      const newObjective: JournalTask = {
+          id: Date.now().toString(),
+          category: 'Bio-Strategic',
+          task: goalForm.name,
+          status: 'Not Started',
+          priority: goalForm.priority,
+          progress: 0,
+          notes: `INITIALIZED: ${goalForm.startDate || 'NOW'}\nNOTES: ${goalForm.notes}`,
+          dueDate: goalForm.targetDate + 'T23:59:59',
+      };
+
+      setObjectives([...objectives, newObjective]);
+      setGoalForm({ name: '', startDate: '', targetDate: '', priority: 'Medium', notes: '' });
+      alert("STRATEGIC VECTOR ADDED: Mission committed to the Sovereign Soul.");
+      setActiveSubTab('OVERVIEW');
+  };
+
   const setHabitReminder = (id: string, time: string) => {
     setHabits(habits.map(h => h.id === id ? { ...h, reminderTime: time } : h));
     setReminderEditHabit(null);
   };
-
-  // Helper to get past 30 days ISO dates
-  const last30Days = useMemo(() => {
-    const dates = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      dates.push(d.toISOString().split('T')[0]);
-    }
-    return dates;
-  }, []);
 
   const renderOverview = () => (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -186,7 +208,7 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
                         onClick={() => setReminderEditHabit(habit.id)}
                         className="mt-2 p-3 bg-white/5 rounded-2xl text-[9px] font-black text-gray-600 hover:text-white transition-all uppercase tracking-widest flex items-center gap-2"
                     >
-                        <Bell size={12} className={habit.reminderTime ? 'text-gold' : ''}/> {habit.reminderTime || 'NO REMINDER'}
+                        <Clock size={12}/> {habit.reminderTime || 'NO REMINDER'}
                     </button>
                 </div>
                 {reminderEditHabit === habit.id && (
@@ -317,54 +339,77 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
       </div>
   );
 
-  const renderHistory = () => (
-    <div className="space-y-12 animate-in slide-in-from-bottom-8 duration-700">
-        <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-6">
-            <div>
-                <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter">Sovereign <span className="text-spartan-red">Historical Ledger</span></h3>
-                <p className="text-[10px] text-gray-500 font-mono uppercase tracking-[0.4em]">Last 30-Day Integrity Visualization</p>
-            </div>
-            <div className="flex gap-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-wealth-green rounded-sm"></div>
-                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Sovereign</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-white/5 rounded-sm border border-white/10"></div>
-                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Broken</span>
+  const renderMissions = () => (
+    <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-8 duration-700">
+        <div className="glass-panel p-12 lg:p-20 rounded-[4rem] lg:rounded-[5rem] border border-white/10 bg-gradient-to-br from-black/60 to-black/20 shadow-5xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none"><Target size={400} className="text-cyber-purple"/></div>
+            <div className="flex items-center gap-8 mb-16 border-b border-white/5 pb-10 relative z-10">
+                <div className="p-6 bg-cyber-purple/20 text-cyber-purple rounded-[2.5rem] shadow-4xl"><Target size={48}/></div>
+                <div>
+                    <h3 className="text-4xl font-display font-black text-white uppercase italic tracking-tighter">Mission Calibration</h3>
+                    <p className="text-[11px] text-gray-500 font-mono uppercase tracking-[0.5em] font-black">Establish New Strategic/Biological Directives</p>
                 </div>
             </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {habits.map(habit => (
-                <div key={habit.id} className="glass-panel p-8 rounded-[3rem] border border-white/5 bg-black/40">
-                    <div className="flex justify-between items-center mb-6">
-                        <h4 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-3">
-                            {habit.isRetentionHabit ? <Flame size={16} className="text-spartan-red"/> : <Zap size={16} className="text-wealth-green"/>}
-                            {habit.name}
-                        </h4>
-                        <span className="text-[10px] font-mono font-black text-wealth-green bg-wealth-green/10 px-3 py-1 rounded-full">{habit.streak}D STREAK</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-10 gap-2">
-                        {last30Days.map(date => {
-                            const isCompleted = habit.history.includes(date);
-                            return (
-                                <div 
-                                    key={date} 
-                                    title={date}
-                                    className={`aspect-square rounded-md border transition-all ${isCompleted ? 'bg-wealth-green border-wealth-green shadow-[0_0_8px_rgba(0,230,118,0.4)]' : 'bg-white/5 border-white/10'}`}
-                                ></div>
-                            );
-                        })}
-                    </div>
-                    <div className="mt-6 pt-4 border-t border-white/5 flex justify-between text-[9px] font-black text-gray-600 uppercase tracking-widest">
-                        <span>30 Days Ago</span>
-                        <span>Today</span>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
+                <div className="space-y-4 md:col-span-2">
+                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Activity size={18} className="text-cyber-purple"/> Mission Directive Name</label>
+                    <input 
+                      type="text"
+                      value={goalForm.name}
+                      onChange={e => setGoalForm({...goalForm, name: e.target.value})}
+                      className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-xl font-mono font-black text-white outline-none focus:border-cyber-purple transition-all shadow-inner"
+                      placeholder="e.g. COMPLETE 90-DAY RETENTION"
+                    />
                 </div>
-            ))}
+                <div className="space-y-4">
+                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Calendar size={18} className="text-electric-blue"/> Start Date</label>
+                    <input 
+                      type="date"
+                      value={goalForm.startDate}
+                      onChange={e => setGoalForm({...goalForm, startDate: e.target.value})}
+                      className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-black text-white outline-none focus:border-electric-blue transition-all shadow-inner"
+                    />
+                </div>
+                <div className="space-y-4">
+                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Target size={18} className="text-spartan-red"/> Target Date</label>
+                    <input 
+                      type="date"
+                      value={goalForm.targetDate}
+                      onChange={e => setGoalForm({...goalForm, targetDate: e.target.value})}
+                      className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-black text-white outline-none focus:border-spartan-red transition-all shadow-inner"
+                    />
+                </div>
+                <div className="space-y-4">
+                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><ShieldAlert size={18} className="text-gold"/> Priority Tier</label>
+                    <select 
+                        value={goalForm.priority}
+                        onChange={e => setGoalForm({...goalForm, priority: e.target.value as any})}
+                        className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-black text-white outline-none focus:border-gold transition-all shadow-inner appearance-none"
+                    >
+                        <option value="Low">Low - Maintenance</option>
+                        <option value="Medium">Medium - Standard</option>
+                        <option value="High">High - Focus Depth</option>
+                        <option value="Critical">Critical - FRONT_LINE</option>
+                    </select>
+                </div>
+                <div className="space-y-4 md:col-span-2">
+                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Plus size={18} className="text-gray-500"/> Tactical Notes</label>
+                    <textarea 
+                      value={goalForm.notes}
+                      onChange={e => setGoalForm({...goalForm, notes: e.target.value})}
+                      className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-bold text-gray-300 outline-none focus:border-white/20 transition-all shadow-inner h-32 resize-none"
+                      placeholder="ESTABLISH EXECUTION PLAN..."
+                    />
+                </div>
+            </div>
+
+            <button 
+              onClick={handleGoalSubmit}
+              className="w-full mt-16 py-8 bg-cyber-purple text-white font-black uppercase tracking-[0.6em] rounded-[3rem] text-sm shadow-5xl hover:scale-[1.02] active:scale-95 transition-all"
+            >
+                AUTHORIZE MISSION VECTOR
+            </button>
         </div>
     </div>
   );
@@ -384,7 +429,7 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
           {[
             { id: 'OVERVIEW', label: 'HUB', icon: Activity, color: 'text-spartan-red' },
             { id: 'AUDIT', label: 'AUDIT', icon: ShieldAlert, color: 'text-spartan-red' },
-            { id: 'HISTORY', label: 'INTEGRITY', icon: Calendar, color: 'text-wealth-green' },
+            { id: 'MISSIONS', label: 'MISSIONS', icon: Target, color: 'text-cyber-purple' },
             { id: 'KNOWLEDGE', label: 'INTEL', icon: Info, color: 'text-gold' }
           ].map(tab => (
             <button 
@@ -400,7 +445,7 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
 
       {activeSubTab === 'OVERVIEW' && renderOverview()}
       {activeSubTab === 'AUDIT' && renderAudit()}
-      {activeSubTab === 'HISTORY' && renderHistory()}
+      {activeSubTab === 'MISSIONS' && renderMissions()}
       {activeSubTab === 'KNOWLEDGE' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {Object.entries(HEALTH_KNOWLEDGE_BASE).map(([key, value]) => (

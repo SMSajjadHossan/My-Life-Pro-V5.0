@@ -6,7 +6,8 @@ import {
   Shield, Target, Zap, Skull, TrendingUp, Lock, Activity, 
   Flame, DollarSign, Brain, ChevronRight, Clock, AlertTriangle,
   CheckCircle2, Circle, ListChecks, Download, Upload, Calendar,
-  Quote, Timer, Swords, Trash2, Edit3, Plus, ShieldCheck
+  Quote, Timer, Swords, Trash2, Edit3, Plus, ShieldCheck,
+  CalendarDays, Star, Layers, Save, Terminal
 } from 'lucide-react';
 
 interface Props {
@@ -26,6 +27,15 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
   const [showObjEditor, setShowObjEditor] = useState(false);
   const [editingObj, setEditingObj] = useState<Partial<JournalTask> | null>(null);
 
+  // Mission Calibration Form State
+  const [goalForm, setGoalForm] = useState({
+      name: '',
+      startDate: '',
+      targetDate: '',
+      priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Critical',
+      notes: ''
+  });
+
   const metrics = useMemo(() => {
     const totalLiquid = (Number(financialData.bankA) || 0) + (Number(financialData.bankB) || 0) + (Number(financialData.bankC) || 0);
     const totalAssets = (financialData.assets || []).reduce((a, b) => a + (Number(b.value) || 0), 0);
@@ -38,7 +48,7 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
     const countdowns = objectives
       .map(obj => {
         const diff = new Date(obj.dueDate).getTime() - new Date().getTime();
-        const daysRemaining = Math.ceil(diff / (1000 * 3600 * 24));
+        const days = Math.ceil(diff / (1000 * 3600 * 24));
         
         let expiryDateStr = 'PERMANENT';
         if (obj.status === 'Completed' && obj.validityYears) {
@@ -48,7 +58,7 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
             expiryDateStr = expiry.toLocaleDateString();
         }
 
-        return { ...obj, daysRemaining, expiryDateStr };
+        return { ...obj, daysRemaining: days, expiryDateStr };
       })
       .sort((a, b) => (a.status === 'Completed' ? 1 : -1) || a.daysRemaining - b.daysRemaining);
 
@@ -62,6 +72,29 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
     if (newSet.has(item)) newSet.delete(item);
     else newSet.add(item);
     setCheckedAuditItems(newSet);
+  };
+
+  const handleGoalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!goalForm.name || !goalForm.targetDate) {
+        alert("MISSION FAILURE: Directive Name and Target Date are non-negotiable.");
+        return;
+    }
+
+    const newObjective: JournalTask = {
+        id: Date.now().toString(),
+        category: 'Bio-Strategic',
+        task: goalForm.name,
+        status: 'Not Started',
+        priority: goalForm.priority,
+        progress: 0,
+        notes: `INITIALIZED: ${goalForm.startDate || 'NOW'}\nNOTES: ${goalForm.notes}`,
+        dueDate: goalForm.targetDate + 'T23:59:59',
+    };
+
+    setObjectives([...objectives, newObjective]);
+    setGoalForm({ name: '', startDate: '', targetDate: '', priority: 'Medium', notes: '' });
+    alert("STRATEGIC VECTOR ADDED: Mission committed to the Sovereign Soul.");
   };
 
   const updateObjectiveStatus = (id: string) => {
@@ -174,8 +207,8 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          {/* DAILY AUDIT */}
-          <div className="lg:col-span-4 glass-panel p-10 rounded-[4rem] bg-black/40 border border-white/5 shadow-5xl flex flex-col h-full overflow-hidden relative min-h-[500px]">
+          {/* DAILY AUDIT (COL 4) */}
+          <div className="lg:col-span-4 glass-panel p-10 rounded-[4rem] bg-black/40 border border-white/5 shadow-5xl flex flex-col h-full overflow-hidden relative min-h-[600px]">
                 <div className="absolute -bottom-20 -left-20 opacity-[0.02]"><ListChecks size={400} className="text-cyber-purple"/></div>
                 <div className="flex justify-between items-center mb-10 relative z-10">
                     <h3 className="text-xs font-black text-white uppercase tracking-[0.6em] flex items-center gap-4"><ListChecks size={24} className="text-cyber-purple"/> PROTOCOL_AUDIT</h3>
@@ -207,8 +240,8 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
 
           <div className="lg:col-span-8 space-y-10">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  {/* TITAN FOCUS VECTOR */}
-                  <div className="glass-panel p-10 rounded-[4rem] bg-gradient-to-br from-spartan-red/10 via-black/40 to-black/60 border border-spartan-red/30 flex flex-col justify-between h-[450px] group shadow-5xl relative overflow-hidden">
+                  {/* TITAN FOCUS VECTOR (COL 4 in nested) */}
+                  <div className="glass-panel p-10 rounded-[4rem] bg-gradient-to-br from-spartan-red/10 via-black/40 to-black/60 border border-spartan-red/30 flex flex-col justify-between min-h-[450px] group shadow-5xl relative overflow-hidden">
                       <div className="absolute -bottom-20 -right-20 opacity-[0.08] group-hover:scale-110 transition-transform duration-[5s]"><Skull size={300} className="text-spartan-red" /></div>
                       <div className="space-y-8 relative z-10">
                           <div className="flex items-center gap-4">
@@ -235,53 +268,91 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
                       </button>
                   </div>
 
-                  {/* TIMELINE DEADLINES (WORKABLE) */}
-                  <div className="glass-panel p-10 rounded-[4rem] border border-white/5 bg-black/40 h-[450px] shadow-5xl relative overflow-hidden group">
-                      <div className="absolute -top-20 -right-20 opacity-[0.05] group-hover:rotate-12 transition-transform duration-[3s]"><Calendar size={300} className="text-gold" /></div>
-                      <div className="flex justify-between items-center mb-8 relative z-10">
-                          <div className="flex items-center gap-4">
-                              <div className="p-4 bg-gold/20 text-gold rounded-[1.5rem] shadow-2xl"><Timer size={24}/></div>
-                              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.6em]">TIMELINE_DEADLINES</h3>
-                          </div>
-                          <button onClick={() => { setEditingObj({}); setShowObjEditor(true); }} className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all">
-                              <Plus size={20} className="text-gold" />
-                          </button>
+                  {/* MISSION CALIBRATION FORM (COL 4 in nested) */}
+                  <div className="glass-panel p-10 rounded-[4rem] bg-gradient-to-br from-cyber-purple/10 via-black/40 to-black/60 border border-cyber-purple/30 flex flex-col shadow-5xl relative overflow-hidden">
+                      <div className="absolute -top-10 -right-10 opacity-[0.03] pointer-events-none"><Target size={300} className="text-cyber-purple" /></div>
+                      <div className="flex items-center gap-4 mb-8">
+                          <div className="p-4 bg-cyber-purple/20 text-cyber-purple rounded-[1.5rem] shadow-2xl"><Target size={24}/></div>
+                          <h3 className="text-[11px] font-black text-white uppercase tracking-[0.6em]">MISSION_CALIBRATION</h3>
                       </div>
-                      
-                      <div className="space-y-4 relative z-10 overflow-y-auto custom-scrollbar h-[290px] pr-2">
-                          {metrics.countdowns.length > 0 ? metrics.countdowns.map((c) => {
-                              const isNear = c.daysRemaining > 0 && c.daysRemaining <= (c.reminderDays || 60);
-                              return (
-                                <div key={c.id} className={`flex justify-between items-center p-6 bg-black/60 border rounded-[2rem] transition-all group/item shadow-inner relative overflow-hidden ${c.status === 'Completed' ? 'border-wealth-green/30 opacity-60' : isNear ? 'border-spartan-red/40' : 'border-white/5 hover:border-gold/40'}`}>
-                                    <div className="flex flex-col gap-1 relative z-10 max-w-[65%]">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[14px] font-black uppercase tracking-tight line-clamp-1 ${c.status === 'Completed' ? 'text-wealth-green line-through' : 'text-white'}`}>{c.task}</span>
-                                            {c.status === 'Completed' && <ShieldCheck size={14} className="text-wealth-green"/>}
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className={`text-[8px] font-black uppercase tracking-widest ${c.priority === 'Critical' ? 'text-spartan-red' : 'text-gray-600'}`}>{c.priority} Vector</span>
-                                            {c.status === 'Completed' && (
-                                                <span className="text-[8px] font-mono text-gold uppercase px-2 py-0.5 bg-gold/10 rounded-full border border-gold/20">Valid Until: {c.expiryDateStr}</span>
-                                            )}
-                                        </div>
+                      <form onSubmit={handleGoalSubmit} className="space-y-4 relative z-10">
+                          <input 
+                            type="text" value={goalForm.name} placeholder="Directive Name (e.g. GRE QUANT)" 
+                            onChange={e => setGoalForm({...goalForm, name: e.target.value})}
+                            className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-xs font-mono font-black text-white outline-none focus:border-cyber-purple shadow-inner"
+                          />
+                          <div className="grid grid-cols-2 gap-4">
+                              <input 
+                                type="date" value={goalForm.targetDate}
+                                onChange={e => setGoalForm({...goalForm, targetDate: e.target.value})}
+                                className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-[10px] font-mono font-black text-gray-400 outline-none focus:border-cyber-purple"
+                              />
+                              <select 
+                                value={goalForm.priority}
+                                onChange={e => setGoalForm({...goalForm, priority: e.target.value as any})}
+                                className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-[10px] font-mono font-black text-gray-400 outline-none focus:border-cyber-purple"
+                              >
+                                  <option value="Low">Low</option>
+                                  <option value="Medium">Medium</option>
+                                  <option value="High">High</option>
+                                  <option value="Critical">Critical</option>
+                              </select>
+                          </div>
+                          <textarea 
+                            value={goalForm.notes} placeholder="Tactical Notes..." 
+                            onChange={e => setGoalForm({...goalForm, notes: e.target.value})}
+                            className="w-full bg-black/60 border border-white/10 rounded-2xl p-4 text-[10px] font-mono font-black text-gray-500 outline-none focus:border-cyber-purple h-20 resize-none shadow-inner"
+                          />
+                          <button type="submit" className="w-full py-4 bg-cyber-purple text-white font-black uppercase tracking-[0.4em] rounded-[1.5rem] text-[10px] shadow-3xl hover:scale-105 transition-all">
+                              AUTHORIZE_VECTOR
+                          </button>
+                      </form>
+                  </div>
+              </div>
+
+              {/* TIMELINE DEADLINES (FULL WIDTH OF SECTION) */}
+              <div className="glass-panel p-10 rounded-[4rem] border border-white/5 bg-black/40 min-h-[450px] shadow-5xl relative overflow-hidden group">
+                  <div className="absolute -top-20 -right-20 opacity-[0.05] group-hover:rotate-12 transition-transform duration-[3s]"><Calendar size={300} className="text-gold" /></div>
+                  <div className="flex justify-between items-center mb-8 relative z-10">
+                      <div className="flex items-center gap-4">
+                          <div className="p-4 bg-gold/20 text-gold rounded-[1.5rem] shadow-2xl"><Timer size={24}/></div>
+                          <h3 className="text-[11px] font-black text-white uppercase tracking-[0.6em]">TIMELINE_DEADLINES</h3>
+                      </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10 overflow-y-auto custom-scrollbar h-[350px] pr-2">
+                      {metrics.countdowns.length > 0 ? metrics.countdowns.map((c) => {
+                          const isNear = c.daysRemaining > 0 && c.daysRemaining <= (c.reminderDays || 60);
+                          return (
+                            <div key={c.id} className={`flex justify-between items-center p-6 bg-black/60 border rounded-[2rem] transition-all group/item shadow-inner relative overflow-hidden ${c.status === 'Completed' ? 'border-wealth-green/30 opacity-60' : isNear ? 'border-spartan-red/40' : 'border-white/5 hover:border-gold/40'}`}>
+                                <div className="flex flex-col gap-1 relative z-10 max-w-[65%]">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-[14px] font-black uppercase tracking-tight line-clamp-1 ${c.status === 'Completed' ? 'text-wealth-green line-through' : 'text-white'}`}>{c.task}</span>
+                                        {c.status === 'Completed' && <ShieldCheck size={14} className="text-wealth-green"/>}
                                     </div>
-                                    <div className="flex flex-col items-end relative z-10">
-                                        <div className="flex gap-1.5 mb-2">
-                                            <button onClick={() => updateObjectiveStatus(c.id)} className={`p-1.5 rounded-lg transition-all ${c.status === 'Completed' ? 'bg-wealth-green text-black' : 'bg-white/5 text-gray-500 hover:text-white'}`}><CheckCircle2 size={14}/></button>
-                                            <button onClick={() => { setEditingObj(c); setShowObjEditor(true); }} className="p-1.5 bg-white/5 rounded-lg text-gray-500 hover:text-white"><Edit3 size={14}/></button>
-                                            <button onClick={() => deleteObjective(c.id)} className="p-1.5 bg-white/5 rounded-lg text-gray-500 hover:text-spartan-red"><Trash2 size={14}/></button>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className={`text-xl font-mono font-black ${c.daysRemaining < 0 ? 'text-gray-700' : isNear ? 'text-spartan-red animate-pulse' : 'text-white'}`}>{c.daysRemaining}D</span>
-                                            <p className="text-[7px] text-gray-700 font-black uppercase tracking-widest">T_MINUS</p>
-                                        </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-[8px] font-black uppercase tracking-widest ${c.priority === 'Critical' ? 'text-spartan-red' : 'text-gray-600'}`}>{c.priority} Vector</span>
+                                        {c.status === 'Completed' && (
+                                            <span className="text-[8px] font-mono text-gold uppercase px-2 py-0.5 bg-gold/10 rounded-full border border-gold/20">Valid Until: {c.expiryDateStr}</span>
+                                        )}
                                     </div>
                                 </div>
-                              );
-                          }) : (
-                            <div className="flex flex-col items-center justify-center py-16 opacity-20 italic font-mono text-xs uppercase tracking-[0.5em]">SCANNING...</div>
-                          )}
-                      </div>
+                                <div className="flex flex-col items-end relative z-10">
+                                    <div className="flex gap-1.5 mb-2">
+                                        <button onClick={() => updateObjectiveStatus(c.id)} className={`p-1.5 rounded-lg transition-all ${c.status === 'Completed' ? 'bg-wealth-green text-black' : 'bg-white/5 text-gray-500 hover:text-white'}`}><CheckCircle2 size={14}/></button>
+                                        <button onClick={() => { setEditingObj(c); setShowObjEditor(true); }} className="p-1.5 bg-white/5 rounded-lg text-gray-500 hover:text-white"><Edit3 size={14}/></button>
+                                        <button onClick={() => deleteObjective(c.id)} className="p-1.5 bg-white/5 rounded-lg text-gray-500 hover:text-spartan-red"><Trash2 size={14}/></button>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`text-xl font-mono font-black ${c.daysRemaining < 0 ? 'text-gray-700' : isNear ? 'text-spartan-red animate-pulse' : 'text-white'}`}>{c.daysRemaining}D</span>
+                                        <p className="text-[7px] text-gray-700 font-black uppercase tracking-widest">T_MINUS</p>
+                                    </div>
+                                </div>
+                            </div>
+                          );
+                      }) : (
+                        <div className="col-span-2 flex flex-col items-center justify-center py-24 opacity-20 italic font-mono text-xs uppercase tracking-[0.5em]">SCANNING_FOR_ACTIVE_FRONT_LINES...</div>
+                      )}
                   </div>
               </div>
 
