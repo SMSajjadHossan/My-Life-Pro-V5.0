@@ -4,11 +4,10 @@ import {
   Terminal, CheckCircle2, Circle, Clock, Zap, Target, Brain, Scroll, 
   ArrowRight, Play, Pause, RotateCcw, Plus, X, AlignLeft,
   Maximize2, ShieldAlert, Award, Compass, Calculator,
-  ExternalLink, BarChart3, Scale, Timer, Cpu, ShieldCheck, 
-  Maximize, Minimize, Trash2, Edit3, CheckCircle
+  ExternalLink, BarChart3, Scale, Timer, Cpu, ShieldCheck
 } from 'lucide-react';
-import { STUDY_PHASES, RULES_OF_POWER_13, RICH_VS_POOR_MINDSET } from '../constants';
-import { JournalTask } from '../types';
+import { STUDY_PHASES, RULES_OF_POWER_13, RICH_VS_POOR_MINDSET } from './constants';
+import { JournalTask } from './types';
 
 interface Props {
     objectives: JournalTask[];
@@ -19,17 +18,12 @@ type TimerMode = 'POMO' | '52_17' | 'ULTRADIAN';
 
 export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
   const [activeTab, setActiveTab] = useState<'DEEP_WORK' | 'PROTOCOLS' | 'WISDOM' | 'DECISION'>('DEEP_WORK');
-  const [isFullScreen, setIsFullScreen] = useState(false);
   
   // --- TIMER STATE ---
   const [mode, setMode] = useState<TimerMode>('POMO');
   const [isRunning, setIsRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [activeTask, setActiveTask] = useState<string>(objectives[0]?.task || 'Neural Lockdown Initiated...');
-
-  // --- EDIT MODAL STATE ---
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingTask, setEditingTask] = useState<Partial<JournalTask> | null>(null);
 
   useEffect(() => {
     let interval: any;
@@ -60,94 +54,8 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const deleteTask = (id: string) => {
-    if (window.confirm("Authorize Deletion of Mission Vector?")) {
-        setObjectives(objectives.filter(o => o.id !== id));
-    }
-  };
-
-  const toggleTaskStatus = (id: string) => {
-    setObjectives(objectives.map(o => {
-        if (o.id === id) {
-            const isDone = o.status === 'Completed';
-            return { 
-                ...o, 
-                status: isDone ? 'Pending' : 'Completed',
-                completionDate: isDone ? undefined : new Date().toISOString()
-            };
-        }
-        return o;
-    }));
-  };
-
-  const saveTaskUpdate = () => {
-    if (!editingTask?.task) return;
-    if (editingTask.id) {
-        setObjectives(objectives.map(o => o.id === editingTask.id ? { ...o, ...editingTask } as JournalTask : o));
-    } else {
-        const newTask: JournalTask = {
-            id: Date.now().toString(),
-            category: 'Strategic',
-            task: editingTask.task!,
-            status: 'Not Started',
-            priority: editingTask.priority || 'Medium',
-            progress: 0,
-            notes: editingTask.notes || '',
-            dueDate: editingTask.dueDate || new Date().toISOString(),
-            validityYears: editingTask.validityYears || 0,
-            reminderDays: editingTask.reminderDays || 60
-        };
-        setObjectives([...objectives, newTask]);
-    }
-    setShowEditModal(false);
-    setEditingTask(null);
-  };
-
   return (
     <div className="space-y-16 pb-48 max-w-[1400px] mx-auto animate-in fade-in duration-1000">
-       {/* FULL SCREEN OVERLAY */}
-       {isFullScreen && (
-           <div className="fixed inset-0 z-[9999] bg-obsidian flex flex-col items-center justify-center p-10 animate-in fade-in zoom-in duration-500">
-                <div className="absolute top-10 right-10">
-                    <button 
-                        onClick={() => setIsFullScreen(false)} 
-                        className="p-6 bg-white/5 hover:bg-white/10 rounded-full text-gray-500 hover:text-white transition-all border border-white/10"
-                    >
-                        <Minimize size={40}/>
-                    </button>
-                </div>
-                
-                <div className="text-center space-y-10">
-                    <p className="text-[12px] font-mono text-spartan-red uppercase tracking-[1.5em] animate-pulse">:: Neural Isolation Active ::</p>
-                    <h2 className="text-4xl md:text-6xl font-display font-black text-white uppercase italic tracking-tighter text-glow-red opacity-80">{activeTask}</h2>
-                    
-                    <div className="text-[15rem] md:text-[25rem] font-mono font-black text-white text-glow-blue leading-none tracking-tighter transition-all duration-700 hover:scale-105 select-none cursor-default">
-                        {formatTime(timeLeft)}
-                    </div>
-                    
-                    <div className="flex gap-8 justify-center">
-                         <button 
-                            onClick={() => setIsRunning(!isRunning)} 
-                            className={`flex items-center gap-6 px-24 py-8 rounded-[3rem] font-black uppercase tracking-[0.6em] transition-all shadow-5xl transform hover:translate-y-[-8px] active:scale-95 ${isRunning ? 'bg-spartan-red text-white' : 'bg-wealth-green text-black'}`}
-                          >
-                              {isRunning ? <><Pause size={32}/> Pause</> : <><Play size={32}/> Engage</>}
-                          </button>
-                          <button 
-                            onClick={() => { setIsRunning(false); handleModeChange(mode); }} 
-                            className="p-8 bg-white/5 border border-white/10 rounded-full text-gray-600 hover:text-white transition-all"
-                          >
-                            <RotateCcw size={32}/>
-                          </button>
-                    </div>
-                </div>
-
-                {/* Subtle Breathing Glow */}
-                <div className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${isRunning ? 'opacity-20' : 'opacity-5'}`}>
-                    <div className="w-full h-full bg-gradient-radial from-electric-blue/20 to-transparent animate-pulse"></div>
-                </div>
-           </div>
-       )}
-
        {/* NAVIGATION TABS */}
        <div className="flex flex-wrap gap-6 border-b border-white/5 pb-12">
           {[
@@ -170,73 +78,29 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
        {/* DEEP WORK TIMER SECTION */}
        {activeTab === 'DEEP_WORK' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in slide-in-from-bottom-8 duration-700">
-              {/* MISSION LIST SECTION */}
-              <div className="lg:col-span-4 glass-panel p-12 rounded-[3.5rem] bg-black/40 h-fit border border-white/5 shadow-4xl relative overflow-hidden">
-                  <div className="flex justify-between items-center mb-10 relative z-10">
-                      <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Terminal size={14}/> Frontier List</h3>
-                      <button 
-                        onClick={() => { setEditingTask({}); setShowEditModal(true); }}
-                        className="p-3 bg-white/5 hover:bg-white/10 rounded-xl text-gray-500 hover:text-white transition-all"
-                      >
-                        <Plus size={16}/>
-                      </button>
-                  </div>
-                  
-                  <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-2 relative z-10">
+              <div className="lg:col-span-4 glass-panel p-12 rounded-[3.5rem] bg-black/40 h-fit border border-white/5 shadow-4xl">
+                  <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-10 flex items-center gap-3"><Terminal size={14}/> Mission Selection</h3>
+                  <div className="space-y-5">
                       {objectives.filter(o => o.status !== 'Completed').map(obj => (
                           <div 
                             key={obj.id} 
-                            className={`group relative p-6 rounded-[2rem] border transition-all cursor-pointer ${activeTask === obj.task ? 'bg-cyber-purple/10 border-cyber-purple/40 shadow-[0_0_30px_rgba(213,0,249,0.1)]' : 'bg-black border-white/5 hover:border-white/20'}`}
-                            onClick={() => setActiveTask(obj.task)}
+                            onClick={() => setActiveTask(obj.task)} 
+                            className={`p-6 rounded-[2rem] border transition-all cursor-pointer group relative overflow-hidden ${activeTask === obj.task ? 'bg-cyber-purple/10 border-cyber-purple/40 shadow-[0_0_30px_rgba(213,0,249,0.1)]' : 'bg-black border-white/5 hover:border-white/20 hover:bg-white/5'}`}
                           >
-                              <div className="flex justify-between items-start">
-                                  <div className="space-y-1 pr-12">
-                                      <p className={`text-xs font-black uppercase tracking-tight ${activeTask === obj.task ? 'text-white' : 'text-gray-500'}`}>{obj.task}</p>
-                                      <p className="text-[8px] font-mono text-gray-700 uppercase tracking-widest">{obj.priority} Priority</p>
-                                  </div>
-                                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); toggleTaskStatus(obj.id); }} 
-                                        className="p-2 bg-black hover:bg-wealth-green/20 text-gray-700 hover:text-wealth-green rounded-lg"
-                                      >
-                                        <CheckCircle size={14}/>
-                                      </button>
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); setEditingTask(obj); setShowEditModal(true); }} 
-                                        className="p-2 bg-black hover:bg-white/10 text-gray-700 hover:text-white rounded-lg"
-                                      >
-                                        <Edit3 size={14}/>
-                                      </button>
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); deleteTask(obj.id); }} 
-                                        className="p-2 bg-black hover:bg-spartan-red/20 text-gray-700 hover:text-spartan-red rounded-lg"
-                                      >
-                                        <Trash2 size={14}/>
-                                      </button>
-                                  </div>
+                              <div className="relative z-10 flex justify-between items-center">
+                                <p className={`text-xs font-black uppercase tracking-tight transition-colors ${activeTask === obj.task ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>{obj.task}</p>
+                                {activeTask === obj.task && <Zap size={14} className="text-cyber-purple animate-pulse" />}
                               </div>
                               {activeTask === obj.task && <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyber-purple"></div>}
                           </div>
                       ))}
                       {objectives.filter(o => o.status !== 'Completed').length === 0 && (
-                          <div className="py-20 text-center opacity-20 italic font-mono text-[10px] uppercase tracking-widest border border-dashed border-white/10 rounded-[2rem]">
-                              NO_ACTIVE_TARGETS_ACQUIRED
-                          </div>
+                          <div className="py-12 text-center opacity-20 italic font-mono text-[10px] uppercase tracking-widest">No Active Frontlines detected. Scan for missions.</div>
                       )}
                   </div>
               </div>
 
-              {/* TIMER DISPLAY SECTION */}
               <div className="lg:col-span-8 glass-panel p-20 rounded-[5rem] border border-white/5 bg-gradient-to-br from-black/60 to-black/20 flex flex-col items-center justify-center text-center shadow-4xl relative overflow-hidden group">
-                  <div className="absolute top-10 right-10 z-20">
-                    <button 
-                        onClick={() => setIsFullScreen(true)}
-                        className="p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] border border-white/10 text-gray-500 hover:text-white transition-all shadow-xl flex items-center gap-3"
-                    >
-                        <Maximize size={18}/> <span className="text-[9px] font-black uppercase tracking-widest">Isolation Mode</span>
-                    </button>
-                  </div>
-                  
                   <div className="absolute inset-0 bg-cyber-purple/5 opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
                   <p className="text-[11px] font-mono text-gray-600 uppercase tracking-[1em] mb-12 animate-pulse relative z-10">:: Neural Focus Lock Protocol ::</p>
                   <h2 className="text-4xl font-display font-black text-white uppercase italic text-glow-blue mb-12 relative z-10 drop-shadow-2xl">{activeTask}</h2>
@@ -265,64 +129,6 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
                           <RotateCcw size={24}/>
                         </button>
                       </div>
-                  </div>
-              </div>
-          </div>
-       )}
-
-       {/* EDIT MODAL */}
-       {showEditModal && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 bg-black/95 backdrop-blur-3xl animate-in fade-in">
-              <div className="glass-panel w-full max-w-xl p-16 rounded-[4.5rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,1)] relative">
-                  <div className="flex justify-between items-center mb-12">
-                      <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter leading-none">
-                        Vector <span className="text-cyber-purple">Calibration</span>
-                      </h3>
-                      <button onClick={() => setShowEditModal(false)} className="p-4 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition-all"><X size={32}/></button>
-                  </div>
-                  
-                  <div className="space-y-10">
-                      <div className="space-y-4">
-                          <label className="text-[11px] font-black text-gray-500 uppercase tracking-[0.4em] ml-4">Directive Identity</label>
-                          <input 
-                            value={editingTask?.task || ''} 
-                            onChange={e => setEditingTask({...editingTask, task: e.target.value})} 
-                            placeholder="e.g. ELECTRONICS_II_MASTERY"
-                            className="w-full bg-black border border-white/10 rounded-[2rem] p-8 text-white font-mono text-sm outline-none focus:border-cyber-purple transition-all shadow-inner"
-                          />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-8">
-                          <div className="space-y-4">
-                              <label className="text-[11px] font-black text-gray-500 uppercase tracking-[0.4em] ml-4">Priority</label>
-                              <select 
-                                value={editingTask?.priority || 'Medium'} 
-                                onChange={e => setEditingTask({...editingTask, priority: e.target.value as any})}
-                                className="w-full bg-black border border-white/10 rounded-[2rem] p-6 text-white font-mono text-xs outline-none focus:border-cyber-purple transition-all shadow-inner"
-                              >
-                                  <option value="Low">Low</option>
-                                  <option value="Medium">Medium</option>
-                                  <option value="High">High Focus</option>
-                                  <option value="Critical">Critical (Frog)</option>
-                              </select>
-                          </div>
-                          <div className="space-y-4">
-                              <label className="text-[11px] font-black text-gray-500 uppercase tracking-[0.4em] ml-4">Due Date</label>
-                              <input 
-                                type="date" 
-                                value={editingTask?.dueDate?.split('T')[0] || ''} 
-                                onChange={e => setEditingTask({...editingTask, dueDate: e.target.value + 'T00:00:00'})}
-                                className="w-full bg-black border border-white/10 rounded-[2rem] p-6 text-white font-mono text-xs outline-none focus:border-cyber-purple transition-all shadow-inner"
-                              />
-                          </div>
-                      </div>
-
-                      <button 
-                        onClick={saveTaskUpdate}
-                        className="w-full py-8 bg-cyber-purple text-white font-black uppercase tracking-[0.6em] rounded-[2.5rem] text-sm shadow-3xl hover:scale-[1.01] active:scale-95 transition-all"
-                      >
-                        Authorize Mission Vector
-                      </button>
                   </div>
               </div>
           </div>
@@ -420,6 +226,24 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
                          <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest">Architect's Heuristic</h4>
                          <p className="text-xl font-bold text-gray-300 italic leading-relaxed">"If it's not a <span className="text-wealth-green">'Hell Yes'</span>, it's a <span className="text-spartan-red">'Hell No'</span>. Avoid the trap of over-optimizing for the short term."</p>
                        </div>
+                   </div>
+               </div>
+
+               {/* ADDITIONAL ANALYTICS MOCKUP */}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                   <div className="glass-panel p-10 rounded-[3.5rem] border border-white/5 bg-black/40 flex items-center gap-8">
+                      <div className="p-6 bg-electric-blue/10 text-electric-blue rounded-[2rem]"><BarChart3 size={32}/></div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Decisional Velocity</p>
+                        <p className="text-2xl font-mono font-black text-white">94% OPTIMIZED</p>
+                      </div>
+                   </div>
+                   <div className="glass-panel p-10 rounded-[3.5rem] border border-white/5 bg-black/40 flex items-center gap-8">
+                      <div className="p-6 bg-wealth-green/10 text-wealth-green rounded-[2rem]"><ShieldCheck size={32}/></div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Strategic Integrity</p>
+                        <p className="text-2xl font-mono font-black text-white">S-TIER SECURE</p>
+                      </div>
                    </div>
                </div>
            </div>

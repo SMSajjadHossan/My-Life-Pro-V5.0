@@ -1,587 +1,516 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FinancialState, Transaction, Asset } from '../types';
-import { INFLATION_RATE_BD } from '../constants';
-// Import Terminal from lucide-react to fix missing reference error
-import { Activity, Crown, Rocket, Shield, Save, Trash2, LayoutDashboard, Zap, RefreshCw, Flame, Landmark, TrendingDown, Wallet, ArrowDownRight, ShieldCheck, CreditCard, Inbox, ChevronRight, Edit3, X, ShieldAlert, Percent, Wind, Binary, ArrowDown, Terminal } from 'lucide-react';
+import { WEALTH_TIMELINE, BD_MARKET_PRESETS, INVESTMENT_RETURN_RATE, INFLATION_RATE_BD } from '../constants';
+import { 
+  Landmark, Plus, X, PieChart, Rocket, Settings, ArrowUpCircle, 
+  Calculator, Unlock, ArrowDownCircle, Target, TrendingUp, 
+  ShieldCheck, History, Map, Landmark as BankIcon, Flame, Zap, DollarSign,
+  ArrowRightCircle, Calendar, Trash2, Edit3, Briefcase, Activity, 
+  ChevronRight, AlertTriangle, ShieldAlert, FastForward, Timer, LineChart, CheckCircle2,
+  Circle, Info, Shield, Droplets, ArrowRight, Gauge, Layers, Split, Wallet, Save
+} from 'lucide-react';
 
 interface Props {
   data: FinancialState;
   updateData: (newData: FinancialState) => void;
+  userAge?: number;
 }
 
-export const WealthFortress: React.FC<Props> = ({ data, updateData }) => {
-  const [activeTab, setActiveTab] = useState<'COMMAND' | 'ENGINE' | 'STRATEGY' | 'AUDIT'>('ENGINE');
+export const WealthFortress: React.FC<Props> = ({ data, updateData, userAge = 24 }) => {
+  const [activeTab, setActiveTab] = useState<'ENGINE' | 'ROADMAP' | 'SIMULATION' | 'LEDGER'>('ENGINE');
+  const [showAssetModal, setShowAssetModal] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Partial<Asset> | null>(null);
   
-  // Ledger Editing State
-  const [editingTxId, setEditingTxId] = useState<string | null>(null);
-  const [txEditForm, setTxEditForm] = useState<Transaction | null>(null);
+  // Inflow Logic State
+  const [inflowAmount, setInflowAmount] = useState(data.monthlyIncome.toString());
+  const [isAutoDistribute, setIsAutoDistribute] = useState(true);
+  const [manualSplit, setManualSplit] = useState({ A: 50, B: 30, C: 20 });
 
-  // --- 1. METRICS ENGINE (Billionaire IQ) ---
+  const [pulseCompound, setPulseCompound] = useState(0);
+
   const metrics = useMemo(() => {
-    const totalAssets = (data.assets || []).reduce((acc, curr) => acc + (curr.value || 0), 0);
-    const totalDebt = (data.loans || []).reduce((acc, curr) => acc + (curr.amount || 0), 0);
-    const liquidCash = (data.bankA || 0) + (data.bankB || 0) + (data.bankC || 0);
-    const realNetWorth = totalAssets + liquidCash - totalDebt;
-    
-    const passiveIncomeMo = (data.assets || []).reduce((acc, curr) => acc + (curr.value * ((curr.roi || 0) / 100 / 12)), 0);
-    const emiTotal = (data.loans || []).reduce((acc, curr) => acc + (curr.monthlyEMI || 0), 0);
-    const burnRate = (data.bankC > 0 ? data.bankC : 50000) + emiTotal; 
-    
-    const freedomRatio = burnRate > 0 ? (passiveIncomeMo / burnRate) * 100 : 0;
-    const emergencyTarget = burnRate * 6;
-    const emergencyProgress = Math.min(100, (data.bankA / emergencyTarget) * 100);
+    const liquidCash = (Number(data.bankA) || 0) + (Number(data.bankB) || 0) + (Number(data.bankC) || 0);
+    const assetVal = (data.assets || []).reduce((acc, curr) => acc + (Number(curr.value) || 0), 0);
+    const totalNetWorth = assetVal + liquidCash;
+    const monthlyBurn = Number(data.roadmapSettings?.targetMonthlyExpense) || 40000;
+    const survivalScore = monthlyBurn > 0 ? (liquidCash / monthlyBurn).toFixed(1) : "999";
+    const targetFreedomNetWorth = monthlyBurn * 12 * 25;
+    const freedomProgress = Math.min(100, (totalNetWorth / (targetFreedomNetWorth || 1)) * 100);
+    const monthlyROI = data.assets.reduce((acc, a) => acc + (a.value * (a.roi / 100 / 12)), 0);
+    const wealthVelocity = monthlyROI + (Number(data.monthlyIncome) || 0) - monthlyBurn;
 
-    return { totalAssets, totalDebt, liquidCash, realNetWorth, passiveIncomeMo, burnRate, freedomRatio, emergencyTarget, emergencyProgress };
+    return { 
+      totalNetWorth, liquidCash, monthlyBurn, survivalScore: Number(survivalScore), 
+      freedomProgress, targetFreedomNetWorth, wealthVelocity, monthlyROI 
+    };
   }, [data]);
 
-  // --- 2. WATERFALL ENGINE LOGIC ---
-  const settings = data.engineSettings || {
-    wealthTaxRate: 20,
-    fixedEmiAllocation: 30000,
-    isSweepInEnabled: true,
-    dividendFlywheelActive: true,
-    inflationAdjustment: true,
-    noLifestyleCreep: true,
-    crashModeActive: false
-  };
+  // 30 Year Simulation Logic
+  const projection = useMemo(() => {
+    const years = 30;
+    const results = [];
+    let currentBalance = metrics.totalNetWorth;
+    let annualExpenses = metrics.monthlyBurn * 12;
+    const annualIncome = (Number(data.monthlyIncome) || 25000) * 12;
+    const weightedROI = data.assets.length > 0 
+        ? data.assets.reduce((acc, a) => acc + (a.roi * (a.value / (metrics.totalNetWorth || 1))), 0) / 100
+        : INVESTMENT_RETURN_RATE;
 
-  const handleEngineToggle = (key: keyof typeof settings) => {
-    updateData({
-      ...data,
-      engineSettings: { ...settings, [key]: !settings[key] }
-    });
-  };
+    for (let i = 0; i < years; i++) {
+        const startBal = currentBalance;
+        const savings = Math.max(0, annualIncome - annualExpenses);
+        const growth = (startBal + savings) * (weightedROI);
+        const endBal = startBal + savings + growth;
+        const isFree = endBal >= (annualExpenses * 25);
 
-  const handleManualSweep = () => {
-    // THE OVERFLOW: Step 3 of your Strategic Flow
-    const surplus = data.bankC; 
-    if (surplus <= 0) return;
-    updateData({
-      ...data,
-      bankC: 0,
-      bankB: (data.bankB || 0) + surplus,
-      layerOpportunity: (data.layerOpportunity || 0) + surplus,
-      transactions: [{
-        id: Date.now().toString(),
-        date: new Date().toISOString().split('T')[0],
-        description: "Waterfall Overflow Sweep",
-        amount: -surplus,
-        category: 'Investment',
-        bank: 'C'
-      }, {
-        id: (Date.now() + 1).toString(),
-        date: new Date().toISOString().split('T')[0],
-        description: "Sweep into Opportunity Fund",
-        amount: surplus,
-        category: 'Investment',
-        bank: 'B'
-      }, ...data.transactions]
-    });
-    alert(`WATERFALL OVERFLOW: ৳${surplus.toLocaleString()} moved to Account 2 Opportunity Fund.`);
-  };
+        results.push({
+            year: i + 1, age: userAge + i, startBal, income: annualIncome,
+            expenses: annualExpenses, savings, roi: (weightedROI * 100).toFixed(1),
+            endBal, isFree
+        });
 
-  const [txForm, setTxForm] = useState({ 
-    date: new Date().toISOString().split('T')[0], 
-    type: 'Expense' as 'Income' | 'Expense' | 'Dividend', 
-    amount: '', 
-    desc: '', 
-    category: 'Needs', 
-    bank: 'C' as 'A' | 'B' | 'C'
-  });
+        currentBalance = endBal;
+        annualExpenses *= (1 + INFLATION_RATE_BD);
+    }
+    return results;
+  }, [data, metrics.totalNetWorth, metrics.monthlyBurn, userAge]);
 
-  const handleSaveTransaction = () => {
-    if (!txForm.amount || !txForm.desc) return;
-    const amountVal = parseFloat(txForm.amount);
-    let newData = { ...data };
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const perSecondGrowth = (metrics.totalNetWorth * INVESTMENT_RETURN_RATE) / (365 * 24 * 3600);
+      setPulseCompound(prev => prev + perSecondGrowth);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [metrics.totalNetWorth]);
 
-    if (txForm.type === 'Income') {
-      // THE WATERFALL AUTOMATION SEQUENCE (Your Exact Request)
-      // Step 1: Fixed amount to Account 3 (Bills)
-      const emiDivert = Math.min(amountVal, settings.fixedEmiAllocation);
-      const remainingAfterEmi = amountVal - emiDivert;
+  const handleCommitInflow = () => {
+    const amt = parseFloat(inflowAmount);
+    if (isNaN(amt) || amt <= 0) return;
 
-      // Step 2: Wealth Tax % to Account 2 (Investments)
-      const wealthTax = remainingAfterEmi * (settings.wealthTaxRate / 100);
-      const hubFinalDeposit = remainingAfterEmi - wealthTax;
-
-      newData.bankA = (newData.bankA || 0) + hubFinalDeposit;
-      newData.bankB = (newData.bankB || 0) + wealthTax;
-      newData.bankC = (newData.bankC || 0) + emiDivert;
-      
-      // Auto-Layering inside Account 2
-      newData.layerCore = (newData.layerCore || 0) + (wealthTax * 0.7);
-      newData.layerAccelerator = (newData.layerAccelerator || 0) + (wealthTax * 0.3);
-    } else if (txForm.type === 'Dividend') {
-        // THE DIVIDEND FLYWHEEL: Reinvest 100% into Core Layer
-        newData.bankB = (newData.bankB || 0) + amountVal;
-        newData.layerCore = (newData.layerCore || 0) + amountVal;
+    let splitA, splitB, splitC;
+    if (isAutoDistribute) {
+        splitA = amt * 0.50; splitB = amt * 0.30; splitC = amt * 0.20;
     } else {
-      if (txForm.bank === 'A') newData.bankA = (newData.bankA || 0) - amountVal;
-      if (txForm.bank === 'B') newData.bankB = (newData.bankB || 0) - amountVal;
-      if (txForm.bank === 'C') newData.bankC = (newData.bankC || 0) - amountVal;
+        const total = manualSplit.A + manualSplit.B + manualSplit.C;
+        splitA = amt * (manualSplit.A / total);
+        splitB = amt * (manualSplit.B / total);
+        splitC = amt * (manualSplit.C / total);
     }
 
     const newTx: Transaction = {
       id: Date.now().toString(),
-      date: txForm.date,
-      description: txForm.desc,
-      amount: txForm.type === 'Expense' ? -amountVal : amountVal,
-      category: txForm.type === 'Income' ? 'Income' : txForm.type === 'Dividend' ? 'Dividend' : txForm.category as any,
-      bank: txForm.type === 'Income' ? 'A' : txForm.type === 'Dividend' ? 'B' : txForm.bank
+      amount: amt,
+      description: 'System Inflow: ' + new Date().toLocaleDateString(),
+      category: 'Income',
+      date: new Date().toISOString(),
+      bank: 'A'
     };
 
-    newData.transactions = [newTx, ...(newData.transactions || [])];
-    updateData(newData);
-    setTxForm({ ...txForm, amount: '', desc: '', type: 'Expense' });
-  };
-
-  const startEditTx = (tx: Transaction) => {
-    setEditingTxId(tx.id);
-    setTxEditForm({ ...tx });
-  };
-
-  const saveTxEdit = () => {
-    if (!txEditForm) return;
     updateData({
         ...data,
-        transactions: data.transactions.map(t => t.id === txEditForm.id ? txEditForm : t)
+        bankA: data.bankA + splitA,
+        bankB: data.bankB + splitB,
+        bankC: data.bankC + splitC,
+        monthlyIncome: amt,
+        transactions: [newTx, ...data.transactions]
     });
-    setEditingTxId(null);
-    setTxEditForm(null);
+    alert("Capital Committed to Sovereign Nodes.");
   };
 
-  const deleteTx = (id: string) => {
-    if (confirm("Permanently delete this entry?")) {
-        updateData({
-            ...data,
-            transactions: data.transactions.filter(t => t.id !== id)
-        });
+  const deleteAsset = (id: string) => {
+    if (window.confirm("Authorize Asset Liquidation?")) {
+        updateData({ ...data, assets: data.assets.filter(a => a.id !== id) });
     }
   };
 
-  const renderEngine = () => (
-    <div className="space-y-10 animate-in fade-in">
-      {/* WATERFALL FLOW VISUALIZATION */}
-      <div className="glass-panel p-8 rounded-[2.5rem] border-l-4 border-l-electric-blue relative overflow-hidden bg-gradient-to-br from-obsidian via-slate-900/40 to-obsidian shadow-2xl">
-        <div className="absolute top-0 right-0 p-8 opacity-5 -rotate-12"><Zap size={300} className="text-electric-blue"/></div>
-        
-        <div className="flex flex-col items-center gap-4 relative z-10">
-          <div className="flex items-center gap-3 mb-6">
-             <div className="p-3 bg-electric-blue/20 rounded-2xl border border-electric-blue/30 shadow-[0_0_20px_rgba(41,121,255,0.2)]"><Zap className="text-electric-blue" size={28}/></div>
-             <h3 className="text-3xl font-display font-black text-white uppercase tracking-tighter">Strategic <span className="text-electric-blue">Waterfall</span> Flow</h3>
-          </div>
+  const saveAsset = () => {
+    if (!editingAsset?.name || !editingAsset?.value) return;
+    const asset: Asset = {
+        id: editingAsset.id || Date.now().toString(),
+        name: editingAsset.name!,
+        value: Number(editingAsset.value),
+        type: editingAsset.type as any || 'Stock',
+        roi: Number(editingAsset.roi) || 12
+    };
 
-          {/* STEP 1: INCOME ARRIVAL */}
-          <div className="w-full max-w-sm flex flex-col items-center group">
-            <div className="w-full bg-emerald-950/20 border border-emerald-500/30 p-6 rounded-2xl text-center shadow-2xl transition-all group-hover:border-emerald-400">
-                <div className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mb-1">Step 1: Intake</div>
-                <p className="text-2xl font-display font-black text-white uppercase tracking-tighter">The Rainmaker</p>
-                <div className="h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent w-full my-2"></div>
-                <p className="text-[10px] text-emerald-500/70 font-mono font-bold uppercase tracking-widest">Inflow Pool (Acc 1)</p>
-            </div>
-            <ArrowDown className="text-gray-700 animate-bounce mt-3" size={28}/>
-          </div>
+    const newAssets = editingAsset.id 
+        ? data.assets.map(a => a.id === editingAsset.id ? asset : a)
+        : [asset, ...data.assets];
 
-          {/* STEP 2: THE HUB */}
-          <div className="w-full max-w-xl">
-            <div className="bg-slate-900 border border-white/10 p-10 rounded-[3rem] text-center shadow-inner relative group hover:border-electric-blue/50 transition-all">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[11px] font-black px-6 py-2 rounded-full border-2 border-white/20 shadow-xl tracking-widest uppercase">Account 1: The Command Center</div>
-                
-                <div className="flex flex-col items-center mb-8">
-                    <p className="text-[11px] text-gray-500 font-black uppercase tracking-widest mb-2">Liquid Shield Balance</p>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-5xl font-mono font-black text-white tracking-tighter">৳ {data.bankA.toLocaleString()}</span>
-                        {settings.isSweepInEnabled && (
-                            <div className="flex items-center gap-1.5 text-[10px] bg-emerald-900/40 text-emerald-400 px-3 py-1 rounded-full border border-emerald-800/50 animate-pulse">
-                                <RefreshCw size={12}/> SWEEP-IN FD
-                            </div>
-                        )}
-                    </div>
-                </div>
+    updateData({ ...data, assets: newAssets });
+    setShowAssetModal(false);
+    setEditingAsset(null);
+  };
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                    <div className="bg-black/60 p-5 rounded-2xl border border-white/5 group/item hover:border-spartan-red/30 transition-colors">
-                        <p className="text-[10px] text-spartan-red font-black uppercase mb-1">Fixed Divert</p>
-                        <p className="text-sm font-bold text-gray-300 leading-tight">Step 1: Account 3 (EMI)</p>
-                        <p className="text-xl font-mono font-black text-white mt-2">৳ {settings.fixedEmiAllocation.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-black/60 p-5 rounded-2xl border border-white/5 group/item hover:border-wealth-green/30 transition-colors">
-                        <p className="text-[10px] text-wealth-green font-black uppercase mb-1">Wealth Tax ({settings.wealthTaxRate}%)</p>
-                        <p className="text-sm font-bold text-gray-300 leading-tight">Step 2: Account 2 (Lab)</p>
-                        <p className="text-xl font-mono font-black text-white mt-2">৳ {((data.monthlyIncome || 0) * (settings.wealthTaxRate/100)).toLocaleString()}</p>
-                    </div>
-                </div>
-            </div>
-          </div>
+  const updateBankBalance = (node: 'A' | 'B' | 'C', val: string) => {
+      const num = parseFloat(val) || 0;
+      updateData({ ...data, [`bank${node}`]: num });
+  };
 
-          <div className="w-full flex justify-between max-w-2xl px-20">
-              <ChevronRight className="rotate-90 text-spartan-red/30" size={32} />
-              <ChevronRight className="rotate-90 text-wealth-green/30" size={32} />
-          </div>
-
-          {/* ACCOUNTS 2 & 3: OPS & LAB */}
-          <div className="flex flex-col md:flex-row gap-8 w-full">
-            
-            {/* OPS */}
-            <div className="flex-1 bg-slate-950 border border-spartan-red/20 p-8 rounded-[2.5rem] relative shadow-2xl flex flex-col group hover:border-spartan-red/40 transition-all">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-spartan-red text-white text-[10px] font-black px-5 py-1.5 rounded-full uppercase tracking-widest shadow-lg">Account 3: Operations</div>
-                <div className="text-center mb-8">
-                    <p className="text-[11px] text-gray-500 font-black uppercase mb-1">Daily Outflow pool</p>
-                    <p className="text-4xl font-mono font-black text-white tracking-tighter">৳ {data.bankC.toLocaleString()}</p>
-                </div>
-                <div className="space-y-4 flex-1">
-                    <div className="p-5 bg-red-950/20 border border-red-900/30 rounded-3xl flex justify-between items-center">
-                        <div>
-                            <p className="text-[10px] text-red-500 font-black uppercase tracking-widest">Bills Reserved</p>
-                            <p className="text-lg font-mono font-black text-white">৳ {settings.fixedEmiAllocation.toLocaleString()}</p>
-                        </div>
-                        <CreditCard size={24} className="text-red-500"/>
-                    </div>
-                    <div className="bg-black/60 p-6 rounded-3xl border border-gray-800 shadow-inner">
-                        <p className="text-[10px] text-blue-400 font-black uppercase italic tracking-widest mb-2">The Overflow Rule</p>
-                        <p className="text-xs text-gray-400 mb-5 leading-relaxed">Flush remaining balance into the Opportunity Fund at end of month.</p>
-                        <button onClick={handleManualSweep} className="w-full py-4 bg-gradient-to-r from-blue-600 to-electric-blue text-white text-[10px] font-black uppercase rounded-2xl shadow-xl transition-all active:scale-95">Execute Overflow Move</button>
-                    </div>
-                </div>
-            </div>
-
-            {/* LAB */}
-            <div className="flex-1 bg-emerald-950/20 border border-wealth-green/20 p-8 rounded-[2.5rem] relative group hover:border-wealth-green/40 hover:bg-emerald-950/30 transition-all shadow-2xl">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-wealth-green text-black text-[10px] font-black px-5 py-1.5 rounded-full uppercase tracking-widest shadow-lg">Account 2: Wealth Lab</div>
-                <div className="text-center mb-8">
-                    <p className="text-[11px] text-emerald-400 font-black uppercase mb-1">Total Investment Power</p>
-                    <p className="text-4xl font-mono font-black text-wealth-green text-glow-green tracking-tighter">৳ {data.bankB.toLocaleString()}</p>
-                </div>
-                <div className="space-y-3">
-                    <div className="bg-black/50 p-5 rounded-2xl border border-white/5 relative group/item overflow-hidden">
-                        <div className="absolute inset-y-0 left-0 w-1.5 bg-blue-500"></div>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="text-[11px] text-blue-400 font-black uppercase tracking-tighter">Layer 1: Core (SIP)</span>
-                            <Shield size={16} className="text-blue-500" />
-                        </div>
-                        <p className="text-2xl font-mono font-black text-white">৳ {(data.layerCore || 0).toLocaleString()}</p>
-                        {settings.dividendFlywheelActive && (
-                            <div className="absolute top-2 right-4 flex items-center gap-1.5 text-[9px] text-blue-400 font-black uppercase bg-blue-900/20 px-2 py-0.5 rounded-full">
-                                <RefreshCw size={10} className="animate-spin-slow"/> Flywheel
-                            </div>
-                        )}
-                    </div>
-                    <div className="bg-black/50 p-5 rounded-2xl border border-white/5 relative group/item">
-                        <div className="absolute inset-y-0 left-0 w-1.5 bg-spartan-red"></div>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="text-[11px] text-spartan-red font-black uppercase tracking-tighter">Layer 2: Accelerator</span>
-                            <Rocket size={16} className="text-spartan-red" />
-                        </div>
-                        <p className="text-2xl font-mono font-black text-white">৳ {(data.layerAccelerator || 0).toLocaleString()}</p>
-                    </div>
-                    <div className={`bg-black/50 p-5 rounded-2xl border relative transition-all ${settings.crashModeActive ? 'border-gold bg-gold/5 animate-pulse' : 'border-white/5'}`}>
-                        <div className="absolute inset-y-0 left-0 w-1.5 bg-gold"></div>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className={`text-[11px] font-black uppercase tracking-tighter ${settings.crashModeActive ? 'text-gold' : 'text-gray-400'}`}>Layer 3: Opportunity</span>
-                            <Flame size={16} className={settings.crashModeActive ? 'text-gold' : 'text-gray-600'} />
-                        </div>
-                        <p className={`text-2xl font-mono font-black ${settings.crashModeActive ? 'text-gold' : 'text-white'}`}>৳ {(data.layerOpportunity || 0).toLocaleString()}</p>
-                    </div>
-                </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* UPGRADES GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className={`glass-panel p-6 rounded-[2rem] border-t-4 transition-all cursor-pointer group shadow-xl ${settings.isSweepInEnabled ? 'border-t-electric-blue bg-electric-blue/5' : 'border-t-gray-800'}`} onClick={() => handleEngineToggle('isSweepInEnabled')}>
-          <ShieldCheck size={28} className={settings.isSweepInEnabled ? 'text-electric-blue' : 'text-gray-600'}/>
-          <h4 className="font-black text-white uppercase text-xs mt-3 tracking-[0.2em]">Liquid Shield</h4>
-          <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">Sweep-in FD active on Account 1. Earn FDR interest on emergency funds while maintaining 100% liquidity.</p>
-        </div>
-        
-        <div className={`glass-panel p-6 rounded-[2rem] border-t-4 transition-all cursor-pointer group shadow-xl ${settings.dividendFlywheelActive ? 'border-t-blue-400 bg-blue-400/5' : 'border-t-gray-800'}`} onClick={() => handleEngineToggle('dividendFlywheelActive')}>
-          <Wind size={28} className={settings.dividendFlywheelActive ? 'text-blue-400' : 'text-gray-600'}/>
-          <h4 className="font-black text-white uppercase text-xs mt-3 tracking-[0.2em]">Flywheel</h4>
-          <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">Auto-reinvest 100% of dividends back into Layer 1. Never spend the seed; only eat the fruit of a giant forest.</p>
-        </div>
-
-        <div className={`glass-panel p-6 rounded-[2rem] border-t-4 transition-all cursor-pointer group shadow-xl ${settings.crashModeActive ? 'border-t-gold bg-gold/5' : 'border-t-gray-800'}`} onClick={() => handleEngineToggle('crashModeActive')}>
-          <Flame size={28} className={settings.crashModeActive ? 'text-gold' : 'text-gray-600'}/>
-          <h4 className="font-black text-white uppercase text-xs mt-3 tracking-[0.2em]">Crash Hunter</h4>
-          <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">Deploy Layer 3 Dry Powder when markets drop 10-20% for billionaire growth capture.</p>
-        </div>
-
-        <div className="glass-panel p-6 rounded-[2rem] border-t-4 border-t-wealth-green bg-wealth-green/5 shadow-xl group">
-          <Binary size={28} className="text-wealth-green"/>
-          <h4 className="font-black text-white uppercase text-xs mt-3 tracking-[0.2em]">Tax Shield</h4>
-          <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">Prioritizing ELSS, PPF, and Tax-loss harvesting logic to minimize leakages and maximize CAGR.</p>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderCommand = () => (
-    <div className="space-y-6 animate-in fade-in">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="glass-panel p-5 rounded-2xl relative overflow-hidden group border-t border-white/5 bg-black/40">
-                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity"><Crown size={56} className="text-white"/></div>
-                <p className="text-[10px] text-gold uppercase font-black tracking-widest">Net Worth Status</p>
-                <p className="text-2xl font-display font-black text-white mt-1 text-glow-gold">৳ {(metrics.realNetWorth / 1000).toFixed(1)}k</p>
-            </div>
-            <div className="glass-panel p-5 rounded-2xl bg-black/40 border-t border-white/5">
-                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest flex items-center gap-2">
-                    <TrendingDown size={14} className="text-red-500"/> Inflation Decay
-                </p>
-                <p className="text-2xl font-mono font-black text-spartan-red mt-1">
-                    -৳{((metrics.liquidCash * INFLATION_RATE_BD) / 365).toFixed(0)} <span className="text-[10px] text-gray-500 uppercase">/Day</span>
-                </p>
-            </div>
-            <div className="glass-panel p-5 rounded-2xl bg-black/40 border-t border-white/5">
-                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Freedom Quotient</p>
-                <p className={`text-2xl font-mono font-black mt-1 ${metrics.freedomRatio >= 100 ? 'text-wealth-green' : 'text-orange-500'}`}>
-                    {metrics.freedomRatio.toFixed(1)}%
-                </p>
-                <p className="text-[8px] text-gray-600 font-mono mt-1">Dividends / Operations</p>
-            </div>
-            <div className="glass-panel p-5 rounded-2xl border-b-4 border-b-electric-blue bg-black/40 border-t border-white/5">
-                <p className="text-[10px] text-electric-blue uppercase font-black tracking-widest">Liquid Total</p>
-                <p className="text-2xl font-mono font-black text-white mt-1">৳ {metrics.liquidCash.toLocaleString()}</p>
-                <div className="flex gap-1 mt-4">
-                   <div className="h-1.5 bg-blue-500 rounded-full flex-1" title="Hub"></div>
-                   <div className="h-1.5 bg-emerald-500 rounded-full flex-1" title="Lab"></div>
-                   <div className="h-1.5 bg-slate-600 rounded-full flex-1" title="Ops"></div>
-                </div>
-            </div>
-        </div>
-
-        <div className="glass-panel p-8 rounded-3xl border border-white/10 shadow-2xl">
-             <div className="flex justify-between items-center mb-8">
-                <div className="flex items-center gap-3">
-                    <Inbox className="text-electric-blue" size={20} />
-                    <h3 className="text-xl font-display font-black text-white uppercase tracking-wider">Transaction Entry</h3>
-                </div>
-                <div className="flex items-center gap-2 bg-emerald-900/10 border border-emerald-500/20 px-4 py-2 rounded-full">
-                    <span className="w-2 h-2 rounded-full bg-wealth-green animate-pulse"></span>
-                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest font-black italic">Waterfall Automator Active</span>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                <div className="space-y-5">
-                    <div className="flex bg-black p-1.5 rounded-xl border border-gray-800 shadow-inner">
-                        <button onClick={() => setTxForm({...txForm, type: 'Income'})} className={`flex-1 py-3 text-xs font-black uppercase rounded-lg transition-all ${txForm.type === 'Income' ? 'bg-wealth-green text-black shadow-[0_0_15px_#00E676]' : 'text-gray-500 hover:text-white'}`}>Income</button>
-                        <button onClick={() => setTxForm({...txForm, type: 'Dividend'})} className={`flex-1 py-3 text-xs font-black uppercase rounded-lg transition-all ${txForm.type === 'Dividend' ? 'bg-blue-600 text-white shadow-[0_0_15px_#2979FF]' : 'text-gray-500 hover:text-white'}`}>Dividend</button>
-                        <button onClick={() => setTxForm({...txForm, type: 'Expense'})} className={`flex-1 py-3 text-xs font-black uppercase rounded-lg transition-all ${txForm.type === 'Expense' ? 'bg-red-600 text-white shadow-[0_0_15px_#DC2626]' : 'text-gray-500 hover:text-white'}`}>Expense</button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="relative group">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-mono font-bold group-focus-within:text-electric-blue">৳</span>
-                            <input 
-                                type="number" 
-                                placeholder="0.00" 
-                                value={txForm.amount}
-                                onChange={e => setTxForm({...txForm, amount: e.target.value})}
-                                className="w-full bg-black border border-gray-800 rounded-xl p-4 pl-9 text-white font-mono text-xl focus:border-electric-blue outline-none transition-all"
-                            />
-                        </div>
-                        <input 
-                            type="text" 
-                            placeholder="Descriptor" 
-                            value={txForm.desc}
-                            onChange={e => setTxForm({...txForm, desc: e.target.value})} 
-                            className="w-full bg-black border border-gray-800 rounded-xl p-4 text-white text-sm font-bold uppercase focus:border-electric-blue outline-none transition-all"
-                        />
-                    </div>
-                    
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <input type="date" value={txForm.date} onChange={e => setTxForm({...txForm, date: e.target.value})} className="flex-1 bg-black border border-gray-800 rounded-xl p-3 text-gray-400 text-xs font-mono font-bold outline-none"/>
-                        {txForm.type === 'Expense' ? (
-                            <select value={txForm.bank} onChange={e => setTxForm({...txForm, bank: e.target.value as any})} className="flex-1 bg-black border border-gray-800 rounded-xl p-3 text-gray-300 text-xs font-black uppercase tracking-widest border-l-2 border-l-red-500">
-                                <option value="C">Account 3: Operations</option>
-                                <option value="A">Account 1: The Hub</option>
-                                <option value="B">Account 2: Wealth Lab</option>
-                            </select>
-                        ) : (
-                          <div className="flex-[2] bg-emerald-900/10 border border-emerald-500/30 p-3 rounded-xl text-[10px] text-emerald-400 flex items-center justify-center font-black uppercase tracking-tighter">
-                             {txForm.type === 'Income' ? 'Protocol: EMI Divert -> Wealth Tax -> Hub' : 'Protocol: Auto-Reinvest into Layer 1'}
-                          </div>
-                        )}
-                    </div>
-
-                    <button onClick={handleSaveTransaction} className={`w-full py-5 rounded-2xl text-sm font-black uppercase tracking-[0.3em] transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xl ${txForm.type === 'Income' ? 'bg-wealth-green text-black' : txForm.type === 'Dividend' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'}`}>
-                        {txForm.type === 'Income' ? "Feed Engine" : txForm.type === 'Dividend' ? "Engage Flywheel" : "Log Deduction"}
-                    </button>
-                </div>
-
-                {/* DISTRIBUTION PREVIEW */}
-                <div className="bg-black/40 border border-gray-800 p-8 rounded-3xl flex flex-col justify-center text-center shadow-inner relative group font-mono">
-                    <div className="absolute top-4 left-4 text-[9px] text-gray-600 font-black uppercase tracking-widest flex items-center gap-2">
-                        <Activity size={10} /> Live Calculation Pulse
-                    </div>
-                    {txForm.amount ? (
-                      <div className="animate-in fade-in space-y-8">
-                        <div>
-                          <p className="text-4xl font-black text-white tracking-tighter">৳ {parseFloat(txForm.amount).toLocaleString()}</p>
-                          <p className={`text-[11px] mt-2 uppercase font-black tracking-widest ${txForm.type === 'Income' ? 'text-wealth-green' : txForm.type === 'Dividend' ? 'text-blue-400' : 'text-spartan-red'}`}>{txForm.type} Detect Protocol</p>
-                        </div>
-                        {txForm.type === 'Income' && (
-                          <div className="grid grid-cols-3 gap-3">
-                             <div className="bg-blue-900/10 p-4 rounded-2xl border border-blue-900/30">
-                                <p className="text-[9px] text-blue-400 font-black uppercase mb-1">Acc 1 Final</p>
-                                <p className="text-sm font-black text-white">৳ {( (parseFloat(txForm.amount) - Math.min(parseFloat(txForm.amount), settings.fixedEmiAllocation)) * (1 - settings.wealthTaxRate/100) ).toFixed(0)}</p>
-                             </div>
-                             <div className="bg-emerald-900/10 p-4 rounded-2xl border border-emerald-900/30">
-                                <p className="text-[9px] text-emerald-400 font-black uppercase mb-1">Acc 2 Tax</p>
-                                <p className="text-sm font-black text-white">৳ {( (parseFloat(txForm.amount) - Math.min(parseFloat(txForm.amount), settings.fixedEmiAllocation)) * (settings.wealthTaxRate/100) ).toFixed(0)}</p>
-                             </div>
-                             <div className="bg-red-900/10 p-4 rounded-2xl border border-red-900/30">
-                                <p className="text-[9px] text-red-400 font-black uppercase mb-1">Acc 3 EMI</p>
-                                <p className="text-sm font-black text-white">৳ {Math.min(parseFloat(txForm.amount), settings.fixedEmiAllocation).toFixed(0)}</p>
-                             </div>
-                          </div>
-                        )}
-                        {txForm.type === 'Dividend' && (
-                          <div className="flex flex-col items-center justify-center gap-4 text-blue-400 py-6 animate-pulse">
-                             <RefreshCw size={48} className="drop-shadow-[0_0_15px_currentColor] animate-spin-slow" />
-                             <p className="text-xs font-black uppercase tracking-widest">Auto-Reinvesting to Core Layer</p>
-                          </div>
-                        )}
-                        {txForm.type === 'Expense' && (
-                          <div className="flex flex-col items-center justify-center gap-4 text-spartan-red py-6 animate-pulse">
-                             <ArrowDownRight size={48} className="drop-shadow-[0_0_15px_currentColor]" />
-                             <p className="text-xs font-black uppercase tracking-widest">Deducting from Acc {txForm.bank}</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-10 opacity-30">
-                        <Terminal size={40} className="text-gray-500 mb-4" />
-                        <p className="text-xs text-gray-500 italic uppercase tracking-widest">Awaiting Pulse...</p>
-                      </div>
-                    )}
-                </div>
-             </div>
-        </div>
-
-        {/* LEDGER */}
-        <div className="glass-panel rounded-3xl overflow-hidden border border-white/5 shadow-2xl">
-             <div className="p-5 border-b border-gray-800 bg-black/60 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                    <Activity size={16} className="text-spartan-red" />
-                    <h3 className="text-xs font-black text-white uppercase tracking-[0.3em]">Core Intelligence Ledger</h3>
-                </div>
-                <span className="text-[10px] text-gray-600 font-mono font-bold uppercase tracking-widest">{data.transactions.length} Secure Entries</span>
-             </div>
-             <div className="max-h-[500px] overflow-y-auto custom-scrollbar bg-black/20">
-                <table className="w-full text-left text-[11px] text-gray-400">
-                    <thead className="bg-black text-gray-500 font-black sticky top-0 uppercase tracking-widest z-10 border-b border-gray-800">
-                        <tr>
-                            <th className="p-5">Timestamp</th>
-                            <th className="p-5">Descriptor</th>
-                            <th className="p-5">Financial Vector</th>
-                            <th className="p-5 text-right">Delta (৳)</th>
-                            <th className="p-5 text-center">Protocol</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800/40">
-                        {data.transactions.map((tx) => (
-                            <tr key={tx.id} className={`transition-colors group ${editingTxId === tx.id ? 'bg-blue-900/10' : 'hover:bg-white/[0.03]'}`}>
-                                {editingTxId === tx.id ? (
-                                    <>
-                                        <td className="p-4"><input type="date" value={txEditForm?.date} onChange={e => setTxEditForm(prev => prev ? {...prev, date: e.target.value} : null)} className="bg-black border border-gray-700 text-white text-[10px] p-1 rounded w-full outline-none"/></td>
-                                        <td className="p-4"><input value={txEditForm?.description} onChange={e => setTxEditForm(prev => prev ? {...prev, description: e.target.value} : null)} className="bg-black border border-gray-700 text-white text-[10px] p-1 rounded w-full outline-none uppercase font-black"/></td>
-                                        <td className="p-4">
-                                            <div className="flex gap-2">
-                                                <select value={txEditForm?.category} onChange={e => setTxEditForm(prev => prev ? {...prev, category: e.target.value as any} : null)} className="bg-black border border-gray-700 text-white text-[9px] p-1 rounded outline-none"><option>Income</option><option>Expense</option><option>Investment</option><option>Dividend</option></select>
-                                                <select value={txEditForm?.bank} onChange={e => setTxEditForm(prev => prev ? {...prev, bank: e.target.value as any} : null)} className="bg-black border border-gray-700 text-white text-[9px] p-1 rounded outline-none"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
-                                            </div>
-                                        </td>
-                                        <td className="p-4"><input type="number" value={txEditForm?.amount} onChange={e => setTxEditForm(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)} className="bg-black border border-gray-700 text-white text-[10px] p-1 rounded w-full text-right outline-none"/></td>
-                                        <td className="p-4 text-center"><button onClick={saveTxEdit} className="text-wealth-green p-1"><Save size={14}/></button></td>
-                                    </>
-                                ) : (
-                                    <>
-                                        <td className="p-5 font-mono text-gray-600 font-bold">{tx.date}</td>
-                                        <td className="p-5 text-white font-black uppercase tracking-tight text-xs">{tx.description}</td>
-                                        <td className="p-5"><span className={`px-2 py-1 rounded-md border font-black uppercase text-[8px] tracking-widest ${tx.amount > 0 ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-500' : 'bg-red-950/40 border-red-900/30 text-red-500'}`}>{tx.category} [Bank {tx.bank}]</span></td>
-                                        <td className={`p-5 text-right font-mono font-black text-sm tracking-tighter ${tx.amount > 0 ? 'text-wealth-green' : 'text-gray-400'}`}>{tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}</td>
-                                        <td className="p-5 text-center">
-                                            <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => startEditTx(tx)} className="p-1.5 hover:bg-blue-900/30 text-gray-500 hover:text-blue-400 rounded"><Edit3 size={12}/></button>
-                                                <button onClick={() => deleteTx(tx.id)} className="p-1.5 hover:bg-red-900/30 text-gray-500 hover:text-red-500 rounded"><Trash2 size={12}/></button>
-                                            </div>
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-             </div>
-        </div>
-    </div>
-  );
+  const blurClass = data.isStealthMode ? 'blur-xl select-none' : '';
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700 pb-20 max-w-7xl mx-auto">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-800/50 pb-6 gap-6">
-        <div>
-           <h2 className="text-4xl font-display font-black text-white uppercase tracking-tighter flex items-center gap-4 group">
-             <div className="p-2 bg-wealth-green text-black rounded-lg shadow-[0_0_20px_rgba(0,230,118,0.4)]"><Landmark size={32} /></div>
-             Wealth <span className="text-wealth-green text-glow-green">Fortress</span>
-           </h2>
-           <p className="text-xs text-gray-500 font-mono mt-2 uppercase tracking-[0.4em] font-black italic">Billionaire Engine Architecture • Optimized for Sovereignty</p>
+    <div className="space-y-12 animate-in fade-in duration-700 pb-32 max-w-[1600px] mx-auto">
+      <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center border-b border-white/5 pb-12 gap-10">
+        <div className="flex items-center gap-8">
+          <div className="p-5 bg-wealth-green text-black rounded-[2rem] shadow-[0_0_40px_rgba(0,230,118,0.4)] animate-pulse">
+            <Landmark size={36} />
+          </div>
+          <div>
+            <h2 className="text-5xl font-display font-black text-white uppercase tracking-tighter italic text-glow-green leading-none">
+              Wealth <span className="text-white">Fortress <span className="text-wealth-green text-2xl ml-2">v10</span></span>
+            </h2>
+            <div className="flex items-center gap-4 mt-4">
+                <span className="text-[10px] bg-white/5 px-4 py-1.5 rounded-full text-gray-500 font-black uppercase tracking-[0.3em] border border-white/5">Status: Sovereign</span>
+                <span className="text-[10px] bg-wealth-green/10 px-4 py-1.5 rounded-full text-wealth-green font-black uppercase tracking-[0.3em] border border-wealth-green/20">Freedom_Progress: {metrics.freedomProgress.toFixed(1)}%</span>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3">
+        
+        <div className="flex flex-wrap gap-3 bg-black/60 p-2 rounded-[2.5rem] border border-white/10 shadow-2xl backdrop-blur-3xl">
             {[
-                {id: 'ENGINE', icon: Zap, label: 'Billionaire Engine'}, 
-                {id: 'COMMAND', icon: LayoutDashboard, label: 'Audit Hub'},
-                {id: 'STRATEGY', icon: Binary, label: 'Efficiency Layers'},
+                { id: 'ENGINE', label: 'Engine', icon: Activity },
+                { id: 'ROADMAP', label: 'Roadmap', icon: Map },
+                { id: 'SIMULATION', label: 'Projector', icon: LineChart },
+                { id: 'LEDGER', label: 'Ledger', icon: History }
             ].map((tab) => (
-                <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-3 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all tracking-widest border ${
-                        activeTab === tab.id 
-                        ? 'bg-amber-400 text-black shadow-[0_0_30px_rgba(251,191,36,0.3)] border-amber-300 scale-105' 
-                        : 'bg-slate-900/50 border-gray-800 text-gray-500 hover:text-white'
-                    }`}
+                <button 
+                  key={tab.id} 
+                  onClick={() => setActiveTab(tab.id as any)} 
+                  className={`flex items-center gap-3 px-8 py-4 rounded-[1.8rem] text-[10px] font-black uppercase transition-all tracking-[0.2em] border-2 ${activeTab === tab.id ? 'bg-white text-black border-white shadow-2xl scale-105' : 'border-transparent text-gray-600 hover:text-white hover:bg-white/5'}`}
                 >
-                    <tab.icon size={16} /> {tab.label}
+                    <tab.icon size={16} />
+                    {tab.label}
                 </button>
             ))}
         </div>
       </header>
 
-      {activeTab === 'ENGINE' && renderEngine()}
-      {activeTab === 'COMMAND' && renderCommand()}
-      {activeTab === 'STRATEGY' && (
-          <div className="space-y-6 animate-in fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="glass-panel p-8 rounded-[2rem] border border-white/5 relative overflow-hidden group">
-                      <h3 className="text-xl font-display font-black text-white uppercase mb-6 flex items-center gap-3"><ShieldCheck className="text-wealth-green" /> The Tax Shield</h3>
-                      <div className="space-y-4">
-                          <div className="bg-black/40 p-5 rounded-2xl border border-white/5 hover:border-wealth-green/30 transition-colors">
-                              <p className="text-[10px] text-wealth-green font-black uppercase mb-1">Harvesting Protocol</p>
-                              <p className="text-sm text-gray-300">Offset share profits with losses before year-end to minimize taxable gains.</p>
-                          </div>
-                          <div className="bg-black/40 p-5 rounded-2xl border border-white/5 hover:border-wealth-green/30 transition-colors">
-                              <p className="text-[10px] text-wealth-green font-black uppercase mb-1">ELSS & PPF Vectors</p>
-                              <p className="text-sm text-gray-300">Utilize Layer 1 for compounded zero-tax growth vehicles.</p>
+      {activeTab === 'ENGINE' && (
+        <div className="space-y-12 animate-in slide-in-from-bottom-8 duration-700">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+              {/* INFLOW MODULE */}
+              <div className="lg:col-span-8 glass-panel p-12 rounded-[4rem] border-2 border-wealth-green/20 bg-gradient-to-br from-wealth-green/5 to-black/40 relative overflow-hidden group">
+                  <div className="absolute -top-10 -right-10 opacity-[0.03] group-hover:rotate-12 transition-transform duration-1000"><DollarSign size={400} className="text-wealth-green"/></div>
+                  <div className="relative z-10 space-y-10">
+                      <div className="flex items-center gap-6">
+                          <div className="p-4 bg-wealth-green text-black rounded-2xl shadow-xl"><Wallet size={28}/></div>
+                          <div>
+                              <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter leading-none">Capital Inflow</h3>
+                              <p className="text-[10px] text-gray-500 font-mono uppercase tracking-[0.4em] mt-2">Manual Income Triage</p>
                           </div>
                       </div>
-                  </div>
-                  <div className="glass-panel p-8 rounded-[2rem] border border-white/5 relative overflow-hidden group">
-                      <h3 className="text-xl font-display font-black text-white uppercase mb-6 flex items-center gap-3"><Wind className="text-blue-500" /> Freedom Flywheel</h3>
-                      <div className="space-y-4">
-                          <div className="bg-black/40 p-5 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-colors">
-                              <p className="text-[10px] text-blue-400 font-black uppercase mb-1">Sovereignty Target</p>
-                              <p className="text-2xl font-mono font-black text-white">৳ {metrics.passiveIncomeMo.toFixed(0)} <span className="text-xs text-gray-500 font-bold uppercase">/ Mo</span></p>
-                              <div className="h-2.5 bg-gray-900 rounded-full overflow-hidden mt-3 relative">
-                                  <div className="h-full bg-blue-500 shadow-[0_0_10px_#2979FF]" style={{width: `${Math.min(100, metrics.freedomRatio)}%`}}></div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-end">
+                          <div className="space-y-4">
+                              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest block ml-2">Amount to Process (BDT)</label>
+                              <div className="relative">
+                                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-mono font-black text-gray-700">৳</span>
+                                  <input 
+                                    type="number" 
+                                    value={inflowAmount}
+                                    onChange={(e) => setInflowAmount(e.target.value)}
+                                    className="w-full bg-black/60 border border-white/10 rounded-[2.5rem] py-10 pl-14 pr-8 text-6xl font-mono font-black text-white text-glow-green focus:border-wealth-green outline-none transition-all"
+                                  />
                               </div>
-                              <p className="text-[9px] text-gray-600 mt-2 uppercase font-bold tracking-widest">{metrics.freedomRatio.toFixed(1)}% TO SOVEREIGNTY DAY</p>
+                          </div>
+                          <div className="space-y-8">
+                              <div className="flex items-center justify-between p-8 bg-black/40 border border-white/5 rounded-[2.5rem]">
+                                  <div className="flex items-center gap-4">
+                                      <Split size={24} className="text-wealth-green" />
+                                      <div>
+                                          <span className="text-[11px] font-black text-white uppercase tracking-widest block">Distribution Mode</span>
+                                          <span className="text-[9px] text-gray-600 font-mono uppercase">{isAutoDistribute ? '50% / 30% / 20% (Hub/Lab/Ops)' : 'Manual Percentile Split'}</span>
+                                      </div>
+                                  </div>
+                                  <button 
+                                    onClick={() => setIsAutoDistribute(!isAutoDistribute)}
+                                    className={`w-16 h-9 rounded-full relative transition-all ${isAutoDistribute ? 'bg-wealth-green' : 'bg-gray-800'}`}
+                                  >
+                                      <div className={`absolute top-1 w-7 h-7 bg-white rounded-full transition-all ${isAutoDistribute ? 'right-1' : 'left-1'}`}></div>
+                                  </button>
+                              </div>
+                              <button 
+                                onClick={handleCommitInflow}
+                                className="w-full py-8 bg-wealth-green text-black font-black uppercase tracking-[0.5em] rounded-[2.5rem] text-sm shadow-3xl hover:scale-[1.02] active:scale-95 transition-all"
+                              >
+                                Commit To Nodes
+                              </button>
                           </div>
                       </div>
+
+                      {!isAutoDistribute && (
+                          <div className="grid grid-cols-3 gap-6 animate-in zoom-in-95">
+                              {['A', 'B', 'C'].map((node) => (
+                                  <div key={node} className="space-y-3">
+                                      <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Node {node} %</label>
+                                      <input 
+                                        type="number" 
+                                        value={manualSplit[node as keyof typeof manualSplit]} 
+                                        onChange={(e) => setManualSplit({...manualSplit, [node]: Number(e.target.value)})}
+                                        className="w-full bg-black border border-white/10 rounded-2xl p-4 text-center text-white font-mono font-black"
+                                      />
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              </div>
+
+              {/* NODE BALANCES - FULLY EDITABLE */}
+              <div className="lg:col-span-4 space-y-8">
+                  <div className="glass-panel p-10 rounded-[4rem] border border-white/5 bg-black/40 space-y-8">
+                      <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.5em]">Live Node Override</h4>
+                      {[
+                        { id: 'A', label: 'Node A (Hub)', val: data.bankA, color: 'text-spartan-red' },
+                        { id: 'B', label: 'Node B (Lab)', val: data.bankB, color: 'text-wealth-green' },
+                        { id: 'C', label: 'Node C (Ops)', val: data.bankC, color: 'text-electric-blue' }
+                      ].map((node) => (
+                          <div key={node.id} className="relative group">
+                              <label className="absolute left-6 -top-2.5 bg-obsidian px-2 text-[8px] font-black text-gray-600 uppercase tracking-widest z-10">{node.label}</label>
+                              <div className="relative">
+                                  <span className="absolute left-6 top-1/2 -translate-y-1/2 font-mono text-gray-700">৳</span>
+                                  <input 
+                                    type="number" 
+                                    value={node.val}
+                                    onChange={(e) => updateBankBalance(node.id as any, e.target.value)}
+                                    className={`w-full bg-black/60 border border-white/5 rounded-[1.8rem] py-6 pl-12 pr-6 text-2xl font-mono font-black ${node.color} outline-none focus:border-white/20 transition-all`}
+                                  />
+                                  <Edit3 size={16} className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+
+                  <div className="glass-panel p-10 rounded-[4rem] border border-white/5 bg-black/40 flex flex-col items-center justify-center text-center group">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-4">Pulse Compound Gain</p>
+                      <h2 className="text-4xl font-mono font-black text-white text-glow-white tracking-tighter">৳{pulseCompound.toFixed(4)}</h2>
+                      <p className="text-[8px] text-gray-700 font-mono mt-2 uppercase tracking-widest">Real-time Session Yield</p>
+                  </div>
+              </div>
+          </div>
+
+          {/* ASSET MANAGEMENT */}
+          <div className="glass-panel p-12 rounded-[4rem] border border-white/5 bg-black/40 h-full relative overflow-hidden">
+                <div className="flex justify-between items-center mb-12">
+                    <div className="flex items-center gap-5">
+                        <div className="p-4 bg-gold/10 text-gold rounded-2xl"><PieChart size={24}/></div>
+                        <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter">Strategic Alpha Vectors</h3>
+                    </div>
+                    <button onClick={() => { setEditingAsset({}); setShowAssetModal(true); }} className="px-10 py-5 bg-gold text-black rounded-[2rem] font-black uppercase text-[11px] tracking-[0.3em] hover:scale-105 transition-all shadow-2xl flex items-center gap-3">
+                        <Plus size={18}/> Deploy Asset
+                    </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {data.assets.map(asset => (
+                        <div key={asset.id} className="p-8 bg-black/60 border border-white/5 rounded-[3rem] group hover:border-gold/40 transition-all shadow-inner relative overflow-hidden">
+                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                <button onClick={() => { setEditingAsset(asset); setShowAssetModal(true); }} className="p-2.5 bg-white/5 hover:bg-white/10 text-gray-500 hover:text-white rounded-xl"><Edit3 size={16}/></button>
+                                <button onClick={() => deleteAsset(asset.id)} className="p-2.5 bg-white/5 hover:bg-spartan-red/20 text-gray-500 hover:text-spartan-red rounded-xl"><Trash2 size={16}/></button>
+                            </div>
+                            <div className="flex items-center gap-6 mb-8">
+                                <div className="p-4 bg-gold/10 text-gold rounded-2xl"><TrendingUp size={24}/></div>
+                                <div>
+                                    <h4 className="text-lg font-black text-white uppercase tracking-tight">{asset.name}</h4>
+                                    <p className="text-[10px] text-gray-600 font-mono uppercase tracking-widest">{asset.type} • {asset.roi}% Yield</p>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-end">
+                                <p className={`text-4xl font-mono font-black text-white tracking-tighter ${blurClass}`}>৳{asset.value.toLocaleString()}</p>
+                                <div className="text-right">
+                                    <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest">Monthly Growth</p>
+                                    <p className="text-sm font-mono font-bold text-wealth-green">+৳{(asset.value * (asset.roi / 100 / 12)).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {data.assets.length === 0 && (
+                        <div className="col-span-full py-32 text-center opacity-20 border-4 border-dashed border-white/5 rounded-[4rem]">
+                            <Target size={64} className="mx-auto mb-6 text-gray-600"/>
+                            <p className="font-mono text-sm uppercase tracking-[0.5em]">No Active Asset Vectors Tracked</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* ROADMAP VIEW - INTERACTIVE FLOWCHART */}
+      {activeTab === 'ROADMAP' && (
+        <div className="space-y-16 animate-in slide-in-from-bottom-8 duration-700">
+            <div className="text-center space-y-4">
+                <h3 className="text-5xl font-display font-black text-white uppercase italic tracking-tighter">Strategic Sovereignty Path</h3>
+                <p className="text-[12px] text-gray-500 font-mono uppercase tracking-[0.6em]">The 5-Phase Deployment Sequence</p>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 relative">
+                <div className="absolute top-1/2 left-0 w-full h-1 bg-white/5 -translate-y-1/2 hidden lg:block z-0"></div>
+                {[
+                  { step: 1, title: "REALITY CHECK", icon: AlertTriangle, val: `${metrics.survivalScore} Mo`, sub: 'Current Runway', status: metrics.survivalScore >= 6 ? 'SECURE' : 'CRITICAL', color: metrics.survivalScore >= 6 ? 'text-wealth-green' : 'text-spartan-red' },
+                  { step: 2, title: "THE SHIELD", icon: Shield, val: `৳${(metrics.monthlyBurn * 6).toLocaleString()}`, sub: '6 Month Target', status: metrics.survivalScore >= 6 ? 'COMPLETE' : 'BUILDING', color: 'text-gold' },
+                  { step: 3, title: "AUTOMATION", icon: Droplets, val: `৳${(data.roadmapSettings?.sipAmount || 0).toLocaleString()}`, sub: 'Monthly SIP', status: 'ACTIVE', color: 'text-electric-blue' },
+                  { step: 4, title: "BUILD ASSETS", icon: Layers, val: `${data.assets.length} Vectors`, sub: 'Active Engines', status: 'SCALING', color: 'text-cyber-purple' },
+                  { step: 5, title: "FREEDOM", icon: Rocket, val: `${metrics.freedomProgress.toFixed(1)}%`, sub: 'Progress To Apex', status: metrics.freedomProgress >= 100 ? 'REACHED' : 'APPROACHING', color: 'text-wealth-green' }
+                ].map((s, i) => (
+                    <div key={i} className="glass-panel p-10 rounded-[3.5rem] border border-white/10 bg-black/60 flex flex-col items-center text-center relative z-10 group hover:-translate-y-4 transition-all duration-500">
+                        <div className={`w-20 h-20 rounded-[2.2rem] flex items-center justify-center mb-8 bg-white/5 border border-white/10 group-hover:scale-110 transition-transform ${s.color}`}>
+                            <s.icon size={32} />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-[0.4em] mb-2">Step 0{s.step}</span>
+                        <h4 className="text-xl font-black text-white uppercase tracking-tight mb-8 leading-none">{s.title}</h4>
+                        <div className="mt-auto w-full pt-8 border-t border-white/5">
+                            <p className={`text-2xl font-mono font-black ${s.color} tracking-tighter`}>{s.val}</p>
+                            <p className="text-[8px] text-gray-600 font-bold uppercase tracking-widest mt-1">{s.sub}</p>
+                            <div className={`mt-4 px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-[0.3em] inline-block ${s.color} bg-white/5`}>{s.status}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+      )}
+
+      {/* PROJECTOR VIEW - 30 YEAR TABLE */}
+      {activeTab === 'SIMULATION' && (
+        <div className="space-y-12 animate-in slide-in-from-bottom-8 duration-700">
+            <div className="glass-panel p-12 rounded-[4rem] border border-white/5 bg-black/40 shadow-4xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-12 opacity-[0.02]"><LineChart size={500}/></div>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 relative z-10 gap-8">
+                    <div>
+                        <h3 className="text-4xl font-display font-black text-white uppercase italic tracking-tighter leading-none mb-3">Chronos Projector</h3>
+                        <p className="text-[10px] text-gray-600 font-mono uppercase tracking-[0.4em]">30-Year Inflation Adjusted Trajectory Analysis</p>
+                    </div>
+                    <div className="flex items-center gap-4 bg-black/60 border border-white/5 p-5 rounded-3xl">
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-wealth-green rounded-full shadow-[0_0_10px_#00E676]"></div>
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Sovereignty Checkpoint</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="overflow-x-auto custom-scrollbar relative z-10">
+                    <table className="w-full text-left border-separate border-spacing-y-4">
+                        <thead>
+                            <tr className="text-[11px] font-black text-gray-600 uppercase tracking-widest">
+                                <th className="pb-4 pl-8">Year / Age</th>
+                                <th className="pb-4 text-right">Start Bal</th>
+                                <th className="pb-4 text-right">Income</th>
+                                <th className="pb-4 text-right">Burn (Exp)</th>
+                                <th className="pb-4 text-right">Savings</th>
+                                <th className="pb-4 text-right">ROI %</th>
+                                <th className="pb-4 text-right">Ending Bal</th>
+                                <th className="pb-4 pr-8 text-center">Freedom?</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {projection.map((row) => (
+                                <tr key={row.year} className={`group transition-all ${row.isFree ? 'bg-wealth-green/5' : 'bg-white/5'} hover:bg-white/10`}>
+                                    <td className="py-6 pl-8 rounded-l-[2rem] border-y border-l border-white/5">
+                                        <div className="flex flex-col">
+                                            <span className="text-white font-black text-sm">Year {row.year}</span>
+                                            <span className="text-gray-500 font-mono text-[9px]">Age {row.age}</span>
+                                        </div>
+                                    </td>
+                                    <td className="py-6 text-right font-mono text-xs text-gray-400 border-y border-white/5 tabular-nums">৳{row.startBal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                    <td className="py-6 text-right font-mono text-xs text-wealth-green border-y border-white/5 tabular-nums">৳{row.income.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                    <td className="py-6 text-right font-mono text-xs text-spartan-red border-y border-white/5 tabular-nums">৳{row.expenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                    <td className="py-6 text-right font-mono text-xs text-blue-400 border-y border-white/5 tabular-nums">৳{row.savings.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                    <td className="py-6 text-right font-mono text-xs text-gold border-y border-white/5 tabular-nums">{row.roi}%</td>
+                                    <td className="py-6 text-right font-mono text-lg font-black text-white text-glow-white border-y border-white/5 tabular-nums">৳{row.endBal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                    <td className="py-6 pr-8 rounded-r-[2rem] border-y border-r border-white/5">
+                                        <div className="flex justify-center">
+                                            {row.isFree ? (
+                                                <div className="p-2 bg-wealth-green/20 text-wealth-green rounded-full shadow-lg"><CheckCircle2 size={24} /></div>
+                                            ) : (
+                                                <Circle className="text-gray-800" size={24} />
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* LEDGER VIEW */}
+      {activeTab === 'LEDGER' && (
+        <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-700 max-w-5xl mx-auto">
+            <div className="glass-panel p-12 rounded-[4rem] border border-white/5 bg-black/40 shadow-4xl">
+                <div className="flex justify-between items-center mb-12">
+                    <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter">Sovereign Ledger</h3>
+                    <button onClick={() => updateData({...data, transactions: []})} className="text-[10px] font-black text-gray-600 hover:text-spartan-red transition-colors uppercase tracking-widest flex items-center gap-3"><Trash2 size={16}/> Wipe Buffer</button>
+                </div>
+                
+                <div className="space-y-4 max-h-[700px] overflow-y-auto custom-scrollbar pr-4">
+                    {data.transactions.map((tx) => (
+                        <div key={tx.id} className="flex items-center justify-between p-8 bg-black/60 border border-white/5 hover:border-white/10 rounded-[2.5rem] transition-all group shadow-inner">
+                            <div className="flex items-center gap-8">
+                                <div className={`p-4 rounded-2xl ${tx.amount > 0 ? 'bg-wealth-green/10 text-wealth-green' : 'bg-spartan-red/10 text-spartan-red'}`}>
+                                    {tx.amount > 0 ? <ArrowUpCircle size={24}/> : <ArrowDownCircle size={24}/>}
+                                </div>
+                                <div>
+                                    <p className="text-lg font-bold text-gray-200 tracking-tight leading-none">{tx.description}</p>
+                                    <p className="text-[10px] font-mono text-gray-600 uppercase tracking-widest mt-2">{new Date(tx.date).toLocaleDateString()} • NODE {tx.bank}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-10">
+                                <p className={`text-2xl font-mono font-black ${tx.amount > 0 ? 'text-wealth-green' : 'text-spartan-red'}`}>
+                                    {tx.amount > 0 ? '+' : ''}৳{Math.abs(tx.amount).toLocaleString()}
+                                </p>
+                                <button onClick={() => updateData({...data, transactions: data.transactions.filter(t => t.id !== tx.id)})} className="p-3 bg-white/5 hover:bg-spartan-red/20 text-gray-700 hover:text-spartan-red rounded-xl opacity-0 group-hover:opacity-100 transition-all"><X size={18}/></button>
+                            </div>
+                        </div>
+                    ))}
+                    {data.transactions.length === 0 && (
+                        <div className="py-40 text-center opacity-20 border-2 border-dashed border-white/10 rounded-[4rem]">
+                            <History size={64} className="mx-auto mb-6"/>
+                            <p className="font-mono text-xs uppercase tracking-[0.5em]">Ledger Buffer Void</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* ASSET MODAL */}
+      {showAssetModal && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/95 backdrop-blur-3xl animate-in fade-in">
+              <div className="glass-panel w-full max-w-xl p-16 rounded-[4rem] border border-white/10 shadow-5xl relative">
+                  <div className="flex justify-between items-center mb-12">
+                      <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter">Vector <span className="text-gold">Calibration</span></h3>
+                      <button onClick={() => setShowAssetModal(false)} className="p-4 hover:bg-white/5 rounded-full transition-all text-gray-500 hover:text-white"><X size={32}/></button>
+                  </div>
+                  <div className="space-y-10">
+                      <div className="space-y-3">
+                          <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Asset Name</label>
+                          <input value={editingAsset?.name || ''} onChange={e => setEditingAsset({...editingAsset, name: e.target.value})} placeholder="e.g. ALPHA_EQUITY_PORTFOLIO" className="w-full bg-black border border-white/10 rounded-2xl p-6 text-white font-mono text-sm outline-none focus:border-gold" />
+                      </div>
+                      <div className="space-y-3">
+                          <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Current Valuation (BDT)</label>
+                          <input type="number" value={editingAsset?.value || ''} onChange={e => setEditingAsset({...editingAsset, value: Number(e.target.value)})} placeholder="0" className="w-full bg-black border border-white/10 rounded-2xl p-6 text-white font-mono text-3xl font-black outline-none focus:border-gold" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-8">
+                          <div className="space-y-3">
+                              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Asset Type</label>
+                              <select value={editingAsset?.type || 'Stock'} onChange={e => setEditingAsset({...editingAsset, type: e.target.value as any})} className="w-full bg-black border border-white/10 rounded-2xl p-6 text-white font-mono text-xs outline-none">
+                                  <option value="Stock">Index/Stock</option>
+                                  <option value="Sanchaypatra">Sanchaypatra</option>
+                                  <option value="FDR">FDR/Fixed Deposit</option>
+                                  <option value="Land">Real Estate</option>
+                                  <option value="Gold">Physical Reserve</option>
+                                  <option value="Business">Enterprise</option>
+                              </select>
+                          </div>
+                          <div className="space-y-3">
+                              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Est. ROI %</label>
+                              <input type="number" value={editingAsset?.roi || ''} onChange={e => setEditingAsset({...editingAsset, roi: Number(e.target.value)})} placeholder="12" className="w-full bg-black border border-white/10 rounded-2xl p-6 text-white font-mono text-xl font-bold outline-none" />
+                          </div>
+                      </div>
+                      <button onClick={saveAsset} className="w-full py-8 bg-gold text-black font-black uppercase tracking-[0.6em] rounded-[2.5rem] text-xs shadow-3xl hover:scale-[1.01] active:scale-95 transition-all">Authorize Vector</button>
                   </div>
               </div>
           </div>

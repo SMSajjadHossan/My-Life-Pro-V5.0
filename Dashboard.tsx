@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
-import { UserProfile, Habit, FinancialState, JournalTask, AppSection } from '../types';
-import { MORNING_PROTOCOL, DAYTIME_PROTOCOL, RULES_OF_POWER_13 } from '../constants';
+import { UserProfile, Habit, FinancialState, JournalTask, AppSection } from './types';
+import { MORNING_PROTOCOL, DAYTIME_PROTOCOL, RULES_OF_POWER_13 } from './constants';
 import { 
   Shield, Target, Zap, Skull, TrendingUp, Lock, Activity, 
   Flame, DollarSign, Brain, ChevronRight, Clock, AlertTriangle,
@@ -38,8 +38,9 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
     const countdowns = objectives
       .map(obj => {
         const diff = new Date(obj.dueDate).getTime() - new Date().getTime();
-        const daysRemaining = Math.ceil(diff / (1000 * 3600 * 24));
+        const days = Math.ceil(diff / (1000 * 3600 * 24));
         
+        // Expiry logic for validity items (GRE is 5 years)
         let expiryDateStr = 'PERMANENT';
         if (obj.status === 'Completed' && obj.validityYears) {
             const completedOn = obj.completionDate ? new Date(obj.completionDate) : new Date();
@@ -48,7 +49,7 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
             expiryDateStr = expiry.toLocaleDateString();
         }
 
-        return { ...obj, daysRemaining, expiryDateStr };
+        return { ...obj, daysRemaining: days, expiryDateStr };
       })
       .sort((a, b) => (a.status === 'Completed' ? 1 : -1) || a.daysRemaining - b.daysRemaining);
 
@@ -295,6 +296,7 @@ export const Dashboard: React.FC<Props> = ({ profile, habits, financialData, obj
                       <div className="flex-1 space-y-4">
                         <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.6em] flex items-center gap-3">TITAN_DECREE</h3>
                         <p className="text-2xl font-display font-black text-white uppercase italic tracking-tighter leading-tight drop-shadow-xl group-hover:text-glow-purple transition-all">
+                          {/* FIXED: Accessed from the metrics object */}
                           {metrics.randomWisdom}
                         </p>
                       </div>

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { WealthFortress } from './components/WealthFortress';
@@ -8,27 +8,26 @@ import { TheAcademy } from './components/TheAcademy';
 import { KnowledgeVault } from './components/KnowledgeVault';
 import { SocialDynamics } from './components/SocialDynamics';
 import { WarRoom } from './components/WarRoom';
-import { AppSection, FinancialState, Habit, Book, UserProfile, JournalTask, DailyAction, ChecklistState } from './types';
+import { AppSection, FinancialState, Habit, Book, UserProfile, JournalTask } from './types';
 import { INITIAL_USER_PROFILE, INITIAL_HABITS, INITIAL_LIBRARY, INITIAL_STRATEGIC_OBJECTIVES } from './constants';
-import { Terminal } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentSection, setCurrentSection] = useState<AppSection>(AppSection.DASHBOARD);
   
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-      try {
-          const saved = localStorage.getItem('user_profile');
-          return saved ? JSON.parse(saved) : { ...INITIAL_USER_PROFILE, xp: 0, level: 1, rank: 'Recruit' };
-      } catch (e) {
-          return { ...INITIAL_USER_PROFILE, xp: 0, level: 1, rank: 'Recruit' };
-      }
+      const saved = localStorage.getItem('user_profile_v10_final');
+      return saved ? JSON.parse(saved) : INITIAL_USER_PROFILE;
   });
 
   const [financialData, setFinancialData] = useState<FinancialState>(() => {
     const defaultData: FinancialState = {
-      bankA: 12000, bankB: 8000, bankC: 20000, 
-      layerCore: 0, layerAccelerator: 0, layerOpportunity: 0,
-      monthlyIncome: 8000,
+      bankA: 50000, bankB: 120000, bankC: 15000, 
+      isStealthMode: false,
+      shadowVault: [],
+      isShadowVaultLocked: true,
+      sessionStartWealth: 0,
+      totalCompoundedThisSession: 0,
+      monthlyIncome: 25000,
       transactions: [],
       assets: [],
       businesses: [],
@@ -36,6 +35,13 @@ const App: React.FC = () => {
       legacyProjects: [],
       budgetSnapshots: [],
       mindsetLogs: [],
+      roadmapSettings: {
+        targetMonthlyExpense: 40000,
+        sipAmount: 25000,
+        currentSIPStreak: 0,
+        retirementTargetAge: 35,
+        inflationAdjusted: true
+      },
       engineSettings: {
         wealthTaxRate: 20,
         fixedEmiAllocation: 30000,
@@ -46,165 +52,148 @@ const App: React.FC = () => {
         crashModeActive: false
       }
     };
-
-    try {
-        const saved = localStorage.getItem('financialData');
-        if (!saved) return defaultData;
-        const parsed = JSON.parse(saved);
-        // Ensure new settings are merged if they don't exist in old storage
-        return { 
-          ...defaultData, 
-          ...parsed, 
-          engineSettings: { ...defaultData.engineSettings, ...(parsed.engineSettings || {}) }
-        };
-    } catch (e) {
-        return defaultData;
-    }
+    const saved = localStorage.getItem('financial_data_v10_final');
+    return saved ? { ...defaultData, ...JSON.parse(saved) } : defaultData;
   });
 
   const [habits, setHabits] = useState<Habit[]>(() => {
-    try {
-        const saved = localStorage.getItem('habits');
-        return saved ? JSON.parse(saved) : INITIAL_HABITS;
-    } catch {
-        return INITIAL_HABITS;
-    }
+    const saved = localStorage.getItem('habits_v10_final');
+    return saved ? JSON.parse(saved) : INITIAL_HABITS;
   });
 
   const [books, setBooks] = useState<Book[]>(() => {
-    try {
-        const saved = localStorage.getItem('books');
-        return saved ? JSON.parse(saved) : INITIAL_LIBRARY;
-    } catch {
-        return INITIAL_LIBRARY;
-    }
+    const saved = localStorage.getItem('books_v10_final');
+    return saved ? JSON.parse(saved) : INITIAL_LIBRARY;
   });
   
   const [objectives, setObjectives] = useState<JournalTask[]>(() => {
-      try {
-          const saved = localStorage.getItem('dash_objectives');
-          return saved ? JSON.parse(saved) : INITIAL_STRATEGIC_OBJECTIVES;
-      } catch {
-          return INITIAL_STRATEGIC_OBJECTIVES;
-      }
+    const saved = localStorage.getItem('objectives_v10_final');
+    return saved ? JSON.parse(saved) : INITIAL_STRATEGIC_OBJECTIVES;
   });
 
-  const [checklists, setChecklists] = useState<ChecklistState>(() => {
-      try {
-          const saved = localStorage.getItem('dash_checklists');
-          return saved ? JSON.parse(saved) : { morning: {}, daytime: {}, mindset: {}, finance: {} };
-      } catch {
-          return { morning: {}, daytime: {}, mindset: {}, finance: {} };
-      }
-  });
-
-  const [dailyActions, setDailyActions] = useState<DailyAction[]>(() => {
-      try {
-          const saved = localStorage.getItem('dash_daily_actions');
-          return saved ? JSON.parse(saved) : [];
-      } catch {
-          return [];
-      }
-  });
-
+  // Pulse Compounding Engine & High-Sensitivity Systemic Risk Calculator
   useEffect(() => {
-      localStorage.setItem('financialData', JSON.stringify(financialData));
-      localStorage.setItem('habits', JSON.stringify(habits));
-      localStorage.setItem('books', JSON.stringify(books));
-      localStorage.setItem('user_profile', JSON.stringify(userProfile));
-      localStorage.setItem('dash_objectives', JSON.stringify(objectives));
-      localStorage.setItem('dash_checklists', JSON.stringify(checklists));
-      localStorage.setItem('dash_daily_actions', JSON.stringify(dailyActions));
-  }, [financialData, habits, books, userProfile, objectives, checklists, dailyActions]);
+    const liquidCash = (Number(financialData.bankA) || 0) + (Number(financialData.bankB) || 0) + (Number(financialData.bankC) || 0);
+    const totalAssetsVal = (financialData.assets || []).reduce((a, b) => a + (Number(b.value) || 0), 0);
+    const totalWealth = liquidCash + totalAssetsVal;
+    
+    // God Mode Risk Logic: Tied to critical habits AND financial liquidity
+    const criticalHabits = habits.filter(h => ['Retention Protocol', 'Prayers (5x)', 'Deep Work (4hr)'].includes(h.name));
+    const failedCriticalCount = criticalHabits.filter(h => h.streak === 0).length;
+    const totalMissedCount = habits.filter(h => h.streak === 0).length;
+    
+    // Custom Biological & Financial Audit Risk
+    let auditRisk = 0;
+    if (userProfile.sleepHours && userProfile.sleepHours < 7) auditRisk += 10;
+    if (userProfile.bodyFat && userProfile.bodyFat > 20) auditRisk += 15;
+    
+    // Financial Risk: Low liquidity relative to burn
+    const monthlyBurn = financialData.roadmapSettings?.targetMonthlyExpense || 40000;
+    if (liquidCash < (monthlyBurn * 2)) auditRisk += 20; // High risk if less than 2 months buffer
 
-  const handleExport = () => {
-      const exportBundle = {
-          meta: { version: "Titanium-9.0", timestamp: new Date().toISOString() },
-          data: { financialData, habits, books, userProfile, objectives, checklists, dailyActions }
-      };
-      const blob = new Blob([JSON.stringify(exportBundle, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `MYLIFE_SOUL_${new Date().toISOString().split('T')[0]}.json`;
-      link.click();
-  };
+    const riskBaseline = 5;
+    const calculatedRisk = Math.min(100, riskBaseline + (failedCriticalCount * 15) + ((totalMissedCount - failedCriticalCount) * 5) + auditRisk);
+    
+    if (userProfile.systemicRisk !== calculatedRisk) {
+        setUserProfile(prev => ({ ...prev, systemicRisk: calculatedRisk }));
+    }
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-          try {
-              const bundle = JSON.parse(event.target?.result as string);
-              if (bundle.data) {
-                  setFinancialData(bundle.data.financialData);
-                  setHabits(bundle.data.habits);
-                  setBooks(bundle.data.books);
-                  setUserProfile(bundle.data.userProfile);
-                  setObjectives(bundle.data.objectives);
-                  setChecklists(bundle.data.checklists);
-                  setDailyActions(bundle.data.dailyActions);
-                  alert("System Re-Sychronized.");
-              }
-          } catch (err) {
-              alert("Import failed.");
-          }
-      };
-      reader.readAsText(file);
-  };
+    if (totalWealth <= 0) return;
+
+    // Pulse compounding simulation (12% APR default, can be dynamic based on assets)
+    const interval = setInterval(() => {
+        const growth = (totalWealth * 0.12) / (365 * 24 * 3600);
+        setFinancialData(prev => ({
+            ...prev,
+            totalCompoundedThisSession: (prev.totalCompoundedThisSession || 0) + growth
+        }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [financialData.bankA, financialData.bankB, financialData.bankC, financialData.assets, financialData.roadmapSettings, habits, userProfile.systemicRisk, userProfile.sleepHours, userProfile.bodyFat]);
+
+  // Persistent Auto-Save
+  useEffect(() => {
+      localStorage.setItem('financial_data_v10_final', JSON.stringify(financialData));
+      localStorage.setItem('user_profile_v10_final', JSON.stringify(userProfile));
+      localStorage.setItem('habits_v10_final', JSON.stringify(habits));
+      localStorage.setItem('books_v10_final', JSON.stringify(books));
+      localStorage.setItem('objectives_v10_final', JSON.stringify(objectives));
+  }, [financialData, userProfile, habits, books, objectives]);
 
   const toggleHabit = (id: string) => {
-    setHabits(prev => prev.map(h => {
-        if(h.id === id) {
-            const today = new Date().toISOString().split('T')[0];
-            const historySet = new Set<string>(h.history || []);
-            if (historySet.has(today)) historySet.delete(today);
-            else historySet.add(today);
-            return { ...h, history: Array.from(historySet), lastCompleted: historySet.has(today) ? today : h.lastCompleted };
+    const today = new Date().toISOString().split('T')[0];
+    setHabits(habits.map(h => {
+      if (h.id === id) {
+        if (h.lastCompleted === today) {
+            return { 
+                ...h, 
+                streak: Math.max(0, h.streak - 1), 
+                lastCompleted: null,
+                history: h.history.filter(d => d !== today)
+            };
         }
-        return h;
+        return { 
+            ...h, 
+            streak: h.streak + 1, 
+            lastCompleted: today,
+            history: [...h.history, today]
+        };
+      }
+      return h;
     }));
   };
 
-  const adjustHabit = (id: string, amount: number) => {
-    setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: Math.max(0, h.streak + amount) } : h));
+  const exportSoul = () => {
+    const soulData = { financialData, userProfile, habits, books, objectives };
+    const blob = new Blob([JSON.stringify(soulData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Sovereign_Soul_v10_GOD_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
   };
 
-  const updateHabit = (id: string, updates: Partial<Habit>) => {
-    setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+  const importSoul = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.financialData) setFinancialData(data.financialData);
+        if (data.userProfile) setUserProfile(data.userProfile);
+        if (data.habits) setHabits(data.habits);
+        if (data.books) setBooks(data.books);
+        if (data.objectives) setObjectives(data.objectives);
+        alert("Soul Reconstruction Successful. v10.GOD System fully recalibrated.");
+      } catch (err) {
+        console.error("Import error:", err);
+        alert("Integrity Failure in Persona File. Data structure mismatch.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const renderSection = () => {
-    switch(currentSection) {
-      case AppSection.DASHBOARD: 
-        return <Dashboard 
-                  profile={userProfile} 
-                  habits={habits} 
-                  financialData={financialData}
-                  objectives={objectives}
-                  setObjectives={setObjectives}
-                  checklists={checklists}
-                  setChecklists={setChecklists}
-                  dailyActions={dailyActions}
-                  setDailyActions={setDailyActions}
-               />;
-      case AppSection.WAR_ROOM: return <WarRoom financialData={financialData} habits={habits} profile={userProfile} objectives={objectives} books={books} />;
-      case AppSection.WEALTH: return <WealthFortress data={financialData} updateData={setFinancialData} />;
+    switch (currentSection) {
+      case AppSection.DASHBOARD: return <Dashboard profile={userProfile} habits={habits} financialData={financialData} objectives={objectives} setObjectives={setObjectives} exportSoul={exportSoul} importSoul={importSoul} setSection={setCurrentSection} />;
+      case AppSection.WEALTH: return <WealthFortress data={financialData} updateData={setFinancialData} userAge={userProfile.age} />;
+      case AppSection.SPARTAN: return <SpartanVessel habits={habits} profile={userProfile} toggleHabit={toggleHabit} updateProfile={setUserProfile} setHabits={setHabits} />;
+      case AppSection.ACADEMY: return <TheAcademy objectives={objectives} setObjectives={setObjectives} />;
       case AppSection.KNOWLEDGE: return <KnowledgeVault books={books} setBooks={setBooks} />;
-      case AppSection.SPARTAN: return <SpartanVessel habits={habits} toggleHabit={toggleHabit} adjustHabit={adjustHabit} updateHabit={updateHabit} />;
-      case AppSection.ACADEMY: return <TheAcademy />;
       case AppSection.SOCIAL: return <SocialDynamics />;
-      default: return null;
+      case AppSection.WAR_ROOM: return <WarRoom financialData={financialData} habits={habits} profile={userProfile} objectives={objectives} books={books} />;
+      default: return <Dashboard profile={userProfile} habits={habits} financialData={financialData} objectives={objectives} setObjectives={setObjectives} exportSoul={exportSoul} importSoul={importSoul} setSection={setCurrentSection} />;
     }
   };
 
   return (
     <Layout 
-        currentSection={currentSection} 
-        setSection={setCurrentSection}
-        onExport={handleExport}
-        onImport={handleImport}
+      currentSection={currentSection} 
+      setSection={setCurrentSection} 
+      financialData={financialData} 
+      setFinancialData={setFinancialData}
+      userProfile={userProfile}
     >
       {renderSection()}
     </Layout>
