@@ -1,8 +1,13 @@
 
+export interface BankAccount {
+  id: string;
+  name: string;
+  balance: number;
+  type: 'Primary' | 'Investment' | 'Daily' | 'Savings' | 'Other';
+}
+
 export interface FinancialState {
-  bankA: number; 
-  bankB: number; 
-  bankC: number; 
+  accounts: BankAccount[]; // Dynamic list instead of bankA/B/C
   isStealthMode: boolean; 
   shadowVault: Asset[];
   isShadowVaultLocked: boolean;
@@ -79,8 +84,8 @@ export interface Habit {
   name: string;
   streak: number;
   lastCompleted: string | null;
-  history: string[]; // Array of ISO Dates (YYYY-MM-DD)
-  reminderTime?: string; // HH:mm
+  history: string[]; 
+  reminderTime?: string; 
   category: 'Health' | 'Mindset' | 'Skill';
   isRetentionHabit?: boolean; 
 }
@@ -95,8 +100,8 @@ export interface JournalTask {
   notes: string;
   dueDate: string; 
   completionDate?: string;
-  validityYears?: number; // For GRE/Certs (e.g., 5)
-  reminderDays?: number; // Days before due to start intensive tracking
+  validityYears?: number; 
+  reminderDays?: number; 
 }
 
 export interface ChatMessage {
@@ -125,7 +130,7 @@ export interface Transaction {
   subcategory?: string;
   paymentMethod?: string;
   date: string;
-  bank: 'A' | 'B' | 'C';
+  bankId: string; // Updated to use account ID
 }
 
 export interface BusinessEntity {

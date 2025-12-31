@@ -12,7 +12,7 @@ import {
 import { 
   Skull, Zap, Activity, Dna, Flame, Utensils, 
   Dumbbell, ShieldAlert, CheckCircle2, Circle, Clock, 
-  Wind, Moon, Sun, Brain, Heart, ChevronRight, Info, Scale, Ruler, TrendingUp, Target, Calendar, Plus
+  Wind, Moon, Sun, Brain, Heart, ChevronRight, Info, Scale, Ruler, TrendingUp, Target, Calendar, Plus, ListChecks, X, Settings2, BarChart3
 } from 'lucide-react';
 
 interface Props {
@@ -26,8 +26,10 @@ interface Props {
 }
 
 export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, updateProfile, setHabits, objectives, setObjectives }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'AUDIT' | 'MISSIONS' | 'KNOWLEDGE'>('OVERVIEW');
+  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'AUDIT' | 'MISSIONS' | 'PROTOCOLS' | 'KNOWLEDGE'>('OVERVIEW');
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [completedProtocolItems, setCompletedProtocolItems] = useState<Set<string>>(new Set());
+  const [detailedHabitId, setDetailedHabitId] = useState<string | null>(null);
   
   const [vitalForm, setVitalForm] = useState({
       weight: profile.weight?.toString() || '',
@@ -43,8 +45,6 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
       notes: ''
   });
 
-  const [reminderEditHabit, setReminderEditHabit] = useState<string | null>(null);
-
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -58,6 +58,7 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
     return { day, phase, nextPhase };
   }, [habits]);
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const today = new Date().getDate();
   const todayPlan: SpartanDayPlan = SPARTAN_MASTER_CYCLE.find(p => p.day === today) || SPARTAN_MASTER_CYCLE[0];
 
@@ -94,323 +95,117 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
         weight, bodyFat, sleepHours,
         systemicRisk: Math.min(100, riskScore)
       });
-      alert("Biological State Committed. v10 Neural Triage re-calculated.");
+      alert("Biological State Committed. Neural Triage updated.");
       setActiveSubTab('OVERVIEW');
   };
 
+  const toggleProtocolItem = (item: string) => {
+    const newSet = new Set(completedProtocolItems);
+    if (newSet.has(item)) newSet.delete(item);
+    else newSet.add(item);
+    setCompletedProtocolItems(newSet);
+  };
+
   const handleGoalSubmit = () => {
-      if (!goalForm.name || !goalForm.targetDate) {
-          alert("MISSION FAILURE: Directive Name and Target Date are non-negotiable.");
-          return;
-      }
+    if (!goalForm.name || !goalForm.targetDate) {
+      alert("Mission parameters incomplete. Target and Name required.");
+      return;
+    }
 
-      const newObjective: JournalTask = {
-          id: Date.now().toString(),
-          category: 'Bio-Strategic',
-          task: goalForm.name,
-          status: 'Not Started',
-          priority: goalForm.priority,
-          progress: 0,
-          notes: `INITIALIZED: ${goalForm.startDate || 'NOW'}\nNOTES: ${goalForm.notes}`,
-          dueDate: goalForm.targetDate + 'T23:59:59',
-      };
+    const newGoal: JournalTask = {
+      id: Date.now().toString(),
+      category: 'MISSION',
+      task: goalForm.name,
+      status: 'Not Started',
+      priority: goalForm.priority,
+      progress: 0,
+      notes: goalForm.notes,
+      dueDate: goalForm.targetDate + 'T00:00:00',
+    };
 
-      setObjectives([...objectives, newObjective]);
-      setGoalForm({ name: '', startDate: '', targetDate: '', priority: 'Medium', notes: '' });
-      alert("STRATEGIC VECTOR ADDED: Mission committed to the Sovereign Soul.");
-      setActiveSubTab('OVERVIEW');
+    setObjectives([...objectives, newGoal]);
+    setGoalForm({
+      name: '',
+      startDate: '',
+      targetDate: '',
+      priority: 'Medium',
+      notes: ''
+    });
+    alert("Mission Vector Authorized.");
+    setActiveSubTab('OVERVIEW');
   };
 
   const setHabitReminder = (id: string, time: string) => {
     setHabits(habits.map(h => h.id === id ? { ...h, reminderTime: time } : h));
-    setReminderEditHabit(null);
   };
 
-  const renderOverview = () => (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 glass-panel p-10 rounded-[3.5rem] border-t-4 border-spartan-red shadow-4xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-12 opacity-[0.03] rotate-12 group-hover:rotate-0 transition-transform duration-1000">
-            <Dna size={400} className="text-spartan-red" />
-          </div>
-          <div className="flex flex-col md:flex-row gap-10 relative z-10 items-center">
-            <div className="relative">
-              <div className="w-48 h-48 rounded-full border-8 border-spartan-red/10 flex items-center justify-center relative shadow-[inset_0_0_50px_rgba(255,42,42,0.1)]">
-                <div className="absolute inset-0 border-t-8 border-spartan-red rounded-full animate-[spin_6s_linear_infinite]"></div>
-                <div className="text-center">
-                  <p className="text-6xl font-mono font-black text-white text-glow-red leading-none">{retention.day}</p>
-                  <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-1">Days Deep</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 space-y-4 text-center md:text-left">
-              <div className="flex items-center justify-center md:justify-start gap-4">
-                <Flame className="text-spartan-red animate-pulse" size={28}/>
-                <h3 className={`text-2xl font-display font-black uppercase italic ${retention.phase.color}`}>{retention.phase.title}</h3>
-              </div>
-              <p className="text-gray-400 text-sm leading-relaxed italic bg-white/5 p-4 rounded-2xl border border-white/5">
-                {retention.phase.desc}
-              </p>
-              <div className="pt-4 space-y-2">
-                <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                  <span>Phase Velocity</span>
-                  <span>Target: {retention.nextPhase?.day || 'MAX'} Days</span>
-                </div>
-                <div className="h-2.5 bg-obsidian rounded-full overflow-hidden border border-white/5">
-                  <div className="h-full bg-gradient-to-r from-spartan-red to-gold shadow-[0_0_15px_rgba(255,42,42,0.5)] transition-all duration-1000" 
-                       style={{width: `${Math.min(100, (retention.day / (retention.nextPhase?.day || 90)) * 100)}%`}}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+  const generateHistoryGrid = (history: string[]) => {
+    const grid = [];
+    const end = new Date();
+    for (let i = 34; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(end.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        grid.push({
+            date: dateStr,
+            isDone: history.includes(dateStr),
+            isToday: dateStr === todayStr
+        });
+    }
+    return grid;
+  };
 
-        <div className="glass-panel p-10 rounded-[3.5rem] border border-white/5 bg-gradient-to-br from-black/40 to-transparent flex flex-col justify-between shadow-2xl relative overflow-hidden group">
-          <div className="absolute -bottom-10 -right-10 opacity-[0.05] group-hover:scale-110 transition-transform">
-            <Clock size={200} className="text-white"/>
-          </div>
-          <div className="space-y-6 relative z-10">
-            <div className="flex justify-between items-center">
-              <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Circadian Sync</h4>
-              <span className="text-xs font-mono font-black text-white">{currentTime.toLocaleTimeString([], { hour12: false })}</span>
-            </div>
-            <div className="bg-black/40 border border-white/5 p-8 rounded-[2.5rem] text-center">
-              <circadianStatus.icon size={36} className={`${circadianStatus.color} mx-auto mb-4 animate-pulse`} />
-              <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Bio-Triage Mode</p>
-              <p className="text-2xl font-display font-black text-white uppercase italic tracking-tighter">{circadianStatus.label}</p>
-            </div>
-          </div>
-          <button onClick={() => setActiveSubTab('AUDIT')} className="w-full mt-8 py-4 bg-white/5 border border-white/10 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all relative z-10">Run Bio-Vitals Scan</button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {spartanHabits.map(habit => {
-          const isDoneToday = habit.lastCompleted === new Date().toISOString().split('T')[0];
-          return (
-            <div key={habit.id} className="relative group">
-                <div className={`glass-panel p-8 rounded-[2.5rem] border transition-all flex flex-col items-center gap-4 text-center ${isDoneToday ? 'border-wealth-green bg-wealth-green/10 shadow-[0_0_30px_rgba(0,230,118,0.1)]' : 'border-white/5 bg-black/40 hover:border-white/20'}`}>
+  const renderProtocols = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-in slide-in-from-bottom-8 duration-700">
+        <div className="glass-panel p-10 rounded-[4rem] bg-black/40 border border-white/5 space-y-8 shadow-4xl">
+            <h3 className="text-xl font-black text-orange-400 uppercase tracking-[0.4em] flex items-center gap-4"><Sun size={24}/> Morning Sovereignty</h3>
+            <div className="space-y-4">
+                {MORNING_PROTOCOL.map(p => (
                     <button 
-                        onClick={() => toggleHabit(habit.id)}
-                        className={`w-16 h-16 rounded-[1.8rem] transition-all shadow-2xl flex items-center justify-center ${isDoneToday ? 'bg-wealth-green text-black' : 'bg-white/5 text-gray-600 hover:text-white'}`}
+                        key={p} 
+                        onClick={() => toggleProtocolItem(p)}
+                        className={`w-full p-6 rounded-[2rem] border flex items-center justify-between transition-all ${completedProtocolItems.has(p) ? 'bg-orange-400/10 border-orange-400/40 text-orange-400' : 'bg-white/5 border-white/5 text-gray-400 hover:border-white/20'}`}
                     >
-                        {habit.isRetentionHabit ? <Flame size={32}/> : <Zap size={32}/>}
+                        <span className="text-xs font-black uppercase tracking-widest">{p}</span>
+                        {completedProtocolItems.has(p) ? <CheckCircle2 size={20}/> : <Circle size={20}/>}
                     </button>
-                    <div>
-                        <p className="text-[14px] font-black text-white uppercase tracking-tight">{habit.name}</p>
-                        <div className="flex items-center justify-center gap-2 mt-2">
-                             <TrendingUp size={14} className="text-wealth-green"/>
-                             <span className="text-[11px] font-mono font-black text-white tracking-widest">{habit.streak} DAY STREAK</span>
-                        </div>
-                    </div>
-                    
+                ))}
+            </div>
+        </div>
+        <div className="glass-panel p-10 rounded-[4rem] bg-black/40 border border-white/5 space-y-8 shadow-4xl">
+            <h3 className="text-xl font-black text-electric-blue uppercase tracking-[0.4em] flex items-center gap-4"><Wind size={24}/> Tactical Day-Plan</h3>
+            <div className="space-y-4">
+                {DAYTIME_PROTOCOL.map(p => (
                     <button 
-                        onClick={() => setReminderEditHabit(habit.id)}
-                        className="mt-2 p-3 bg-white/5 rounded-2xl text-[9px] font-black text-gray-600 hover:text-white transition-all uppercase tracking-widest flex items-center gap-2"
+                        key={p} 
+                        onClick={() => toggleProtocolItem(p)}
+                        className={`w-full p-6 rounded-[2rem] border flex items-center justify-between transition-all ${completedProtocolItems.has(p) ? 'bg-electric-blue/10 border-electric-blue/40 text-electric-blue' : 'bg-white/5 border-white/5 text-gray-400 hover:border-white/20'}`}
                     >
-                        <Clock size={12}/> {habit.reminderTime || 'NO REMINDER'}
+                        <span className="text-xs font-black uppercase tracking-widest">{p}</span>
+                        {completedProtocolItems.has(p) ? <CheckCircle2 size={20}/> : <Circle size={20}/>}
                     </button>
-                </div>
-                {reminderEditHabit === habit.id && (
-                    <div className="absolute inset-0 z-20 bg-black/95 rounded-[2.5rem] p-8 flex flex-col justify-center items-center animate-in zoom-in-95 border border-white/10">
-                        <p className="text-[11px] font-black text-gray-500 uppercase mb-6 tracking-widest">Set Alert Directive</p>
-                        <input 
-                            type="time" 
-                            className="bg-black border border-white/10 rounded-2xl p-4 text-white font-mono mb-6 outline-none focus:border-wealth-green shadow-inner w-full text-center"
-                            onChange={(e) => setHabitReminder(habit.id, e.target.value)}
-                        />
-                        <button onClick={() => setReminderEditHabit(null)} className="text-[10px] text-gray-500 uppercase font-black tracking-widest hover:text-white transition-colors">Abort</button>
-                    </div>
-                )}
+                ))}
             </div>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="glass-panel p-10 rounded-[3.5rem] bg-black/40 border border-white/5 shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-5 -rotate-12 group-hover:rotate-0 transition-transform"><Utensils size={100} className="text-white"/></div>
-          <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.5em] mb-10 flex items-center gap-3"><Utensils size={20} className="text-orange-400"/> Nutritional Triage</h4>
-          <div className="space-y-8">
-            <div className="relative pl-8 border-l-2 border-orange-400/20">
-              <div className="absolute -left-1.5 top-0 w-3 h-3 bg-orange-400 rounded-full shadow-[0_0_10px_rgba(251,146,60,0.5)]"></div>
-              <p className="text-[10px] font-black text-gray-600 uppercase mb-1 tracking-widest">Morning Payload (08:00)</p>
-              <p className="text-base font-bold text-gray-200">{todayPlan.morningMeal}</p>
-            </div>
-            <div className="relative pl-8 border-l-2 border-electric-blue/20">
-              <div className="absolute -left-1.5 top-0 w-3 h-3 bg-electric-blue rounded-full shadow-[0_0_10px_rgba(41,121,255,0.5)]"></div>
-              <p className="text-[10px] font-black text-gray-600 uppercase mb-1 tracking-widest">Night Payload (20:00)</p>
-              <p className="text-base font-bold text-gray-200">{todayPlan.nightMeal}</p>
-            </div>
-          </div>
         </div>
-
-        <div className="glass-panel p-10 rounded-[3.5rem] bg-black/40 border border-white/5 shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-5 -rotate-12 group-hover:rotate-0 transition-transform"><Dumbbell size={100} className="text-white"/></div>
-          <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.5em] mb-10 flex items-center gap-3"><Dumbbell size={20} className="text-spartan-red"/> Physical Warfare</h4>
-          <div className="space-y-6">
-            <div className="text-center pb-8 border-b border-white/5">
-              <p className="text-[10px] font-black text-gray-600 uppercase mb-2 tracking-widest">Cycle Focus</p>
-              <p className="text-4xl font-display font-black text-white uppercase italic text-glow-red tracking-tighter">{todayPlan.gymFocus}</p>
-            </div>
-            <div className="space-y-4 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
-              {todayPlan.gymRoutine.map((ex, i) => (
-                <div key={i} className="flex justify-between items-center p-4 bg-black/40 rounded-[1.5rem] border border-white/5 hover:border-spartan-red/30 transition-all shadow-inner">
-                  <span className="text-[12px] font-bold text-gray-300">{ex.name}</span>
-                  <span className="text-[12px] font-mono font-black text-spartan-red">{ex.sets}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="glass-panel p-10 rounded-[3.5rem] bg-gradient-to-t from-spartan-red/10 to-transparent border border-white/10 shadow-3xl flex flex-col items-center justify-center text-center group">
-          <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center mb-8 border border-white/10 group-hover:scale-110 group-hover:border-spartan-red/50 transition-all shadow-2xl">
-            <ShieldAlert size={48} className="text-gray-600 group-hover:text-spartan-red transition-colors" />
-          </div>
-          <h4 className="text-sm font-black text-white uppercase tracking-[0.4em] mb-4">Biological Audit</h4>
-          <p className="text-[11px] text-gray-500 font-mono leading-relaxed uppercase max-w-[240px]">Perform manual vital scan for systemic risk verification.</p>
-          <button onClick={() => setActiveSubTab('AUDIT')} className="mt-10 px-8 py-3.5 bg-spartan-red text-white text-[11px] font-black uppercase rounded-2xl hover:scale-105 transition-all shadow-2xl shadow-red-900/30">Initiate Audit Scan</button>
-        </div>
-      </div>
     </div>
   );
 
-  const renderAudit = () => (
-      <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-8 duration-700">
-          <div className="glass-panel p-12 lg:p-20 rounded-[4rem] lg:rounded-[5rem] border border-white/10 bg-gradient-to-br from-black/60 to-black/20 shadow-5xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none"><Activity size={400}/></div>
-              <div className="flex items-center gap-8 mb-16 border-b border-white/5 pb-10 relative z-10">
-                  <div className="p-6 bg-spartan-red/20 text-spartan-red rounded-[2.5rem] shadow-4xl"><Activity size={48}/></div>
-                  <div>
-                      <h3 className="text-4xl font-display font-black text-white uppercase italic tracking-tighter">Bio-Vitals Triage</h3>
-                      <p className="text-[11px] text-gray-500 font-mono uppercase tracking-[0.5em] font-black">Manual System Integrity Check Required</p>
-                  </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
-                  <div className="space-y-4">
-                      <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Scale size={18} className="text-spartan-red"/> Mass Indicator (KG)</label>
-                      <input 
-                        type="number"
-                        value={vitalForm.weight}
-                        onChange={e => setVitalForm({...vitalForm, weight: e.target.value})}
-                        className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-8 text-3xl font-mono font-black text-white outline-none focus:border-spartan-red transition-all shadow-inner"
-                        placeholder="0.0"
-                      />
-                  </div>
-                  <div className="space-y-4">
-                      <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><TrendingUp size={18} className="text-spartan-red"/> Lipid Density %</label>
-                      <input 
-                        type="number"
-                        value={vitalForm.bodyFat}
-                        onChange={e => setVitalForm({...vitalForm, bodyFat: e.target.value})}
-                        className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-8 text-3xl font-mono font-black text-white outline-none focus:border-spartan-red transition-all shadow-inner"
-                        placeholder="0.0"
-                      />
-                  </div>
-                  <div className="space-y-4 md:col-span-2">
-                      <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Moon size={18} className="text-electric-blue"/> Recovery Window (Hrs)</label>
-                      <input 
-                        type="number"
-                        value={vitalForm.sleepHours}
-                        onChange={e => setVitalForm({...vitalForm, sleepHours: e.target.value})}
-                        className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-8 text-3xl font-mono font-black text-white outline-none focus:border-electric-blue transition-all shadow-inner"
-                        placeholder="0.0"
-                      />
-                  </div>
-              </div>
-
-              <div className="mt-16 p-10 bg-white/5 border border-white/5 rounded-[3rem] flex flex-col md:flex-row items-center gap-10 relative z-10 shadow-inner">
-                   <div className="p-6 bg-spartan-red/10 text-spartan-red rounded-[2rem] shadow-2xl"><ShieldAlert size={36}/></div>
-                   <div className="space-y-2 text-center md:text-left">
-                       <p className="text-sm text-gray-400 font-bold leading-relaxed italic">"Bio-integrity is the prerequisite for Strategic Sovereignity. Dishonest data results in system failure."</p>
-                       <p className="text-[10px] text-gray-600 font-mono uppercase tracking-widest font-black">Current Risk Matrix: {profile.systemicRisk}% • Authorized Scan Initiated</p>
-                   </div>
-              </div>
-
-              <button 
-                onClick={handleVitalsSubmit}
-                className="w-full mt-16 py-8 bg-spartan-red text-white font-black uppercase tracking-[0.6em] rounded-[3rem] text-sm shadow-[0_30_60_rgba(255,42,42,0.3)] hover:scale-[1.02] active:scale-95 transition-all"
-              >
-                  COMMIT SCAN TO SOVEREIGN LEDGER
-              </button>
-          </div>
-      </div>
-  );
-
-  const renderMissions = () => (
-    <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-8 duration-700">
-        <div className="glass-panel p-12 lg:p-20 rounded-[4rem] lg:rounded-[5rem] border border-white/10 bg-gradient-to-br from-black/60 to-black/20 shadow-5xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none"><Target size={400} className="text-cyber-purple"/></div>
-            <div className="flex items-center gap-8 mb-16 border-b border-white/5 pb-10 relative z-10">
-                <div className="p-6 bg-cyber-purple/20 text-cyber-purple rounded-[2.5rem] shadow-4xl"><Target size={48}/></div>
-                <div>
-                    <h3 className="text-4xl font-display font-black text-white uppercase italic tracking-tighter">Mission Calibration</h3>
-                    <p className="text-[11px] text-gray-500 font-mono uppercase tracking-[0.5em] font-black">Establish New Strategic/Biological Directives</p>
-                </div>
+  const renderKnowledge = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-8 duration-700">
+        {Object.entries(HEALTH_KNOWLEDGE_BASE).map(([key, value]) => (
+        <div key={key} className="glass-panel p-10 rounded-[3rem] border border-white/5 bg-black/40 shadow-xl group hover:border-blue-400/30 transition-all relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-5"><Info size={80} className="text-blue-400"/></div>
+            <h4 className="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+            <Info size={18}/> {key}
+            </h4>
+            <p className="text-xs text-gray-300 leading-relaxed font-bold italic mb-6">
+            {value}
+            </p>
+            <div className="pt-6 border-t border-white/5">
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Sovereign Intel: Verified</p>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
-                <div className="space-y-4 md:col-span-2">
-                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Activity size={18} className="text-cyber-purple"/> Mission Directive Name</label>
-                    <input 
-                      type="text"
-                      value={goalForm.name}
-                      onChange={e => setGoalForm({...goalForm, name: e.target.value})}
-                      className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-xl font-mono font-black text-white outline-none focus:border-cyber-purple transition-all shadow-inner"
-                      placeholder="e.g. COMPLETE 90-DAY RETENTION"
-                    />
-                </div>
-                <div className="space-y-4">
-                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Calendar size={18} className="text-electric-blue"/> Start Date</label>
-                    <input 
-                      type="date"
-                      value={goalForm.startDate}
-                      onChange={e => setGoalForm({...goalForm, startDate: e.target.value})}
-                      className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-black text-white outline-none focus:border-electric-blue transition-all shadow-inner"
-                    />
-                </div>
-                <div className="space-y-4">
-                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Target size={18} className="text-spartan-red"/> Target Date</label>
-                    <input 
-                      type="date"
-                      value={goalForm.targetDate}
-                      onChange={e => setGoalForm({...goalForm, targetDate: e.target.value})}
-                      className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-black text-white outline-none focus:border-spartan-red transition-all shadow-inner"
-                    />
-                </div>
-                <div className="space-y-4">
-                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><ShieldAlert size={18} className="text-gold"/> Priority Tier</label>
-                    <select 
-                        value={goalForm.priority}
-                        onChange={e => setGoalForm({...goalForm, priority: e.target.value as any})}
-                        className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-black text-white outline-none focus:border-gold transition-all shadow-inner appearance-none"
-                    >
-                        <option value="Low">Low - Maintenance</option>
-                        <option value="Medium">Medium - Standard</option>
-                        <option value="High">High - Focus Depth</option>
-                        <option value="Critical">Critical - FRONT_LINE</option>
-                    </select>
-                </div>
-                <div className="space-y-4 md:col-span-2">
-                    <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Plus size={18} className="text-gray-500"/> Tactical Notes</label>
-                    <textarea 
-                      value={goalForm.notes}
-                      onChange={e => setGoalForm({...goalForm, notes: e.target.value})}
-                      className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-bold text-gray-300 outline-none focus:border-white/20 transition-all shadow-inner h-32 resize-none"
-                      placeholder="ESTABLISH EXECUTION PLAN..."
-                    />
-                </div>
-            </div>
-
-            <button 
-              onClick={handleGoalSubmit}
-              className="w-full mt-16 py-8 bg-cyber-purple text-white font-black uppercase tracking-[0.6em] rounded-[3rem] text-sm shadow-5xl hover:scale-[1.02] active:scale-95 transition-all"
-            >
-                AUTHORIZE MISSION VECTOR
-            </button>
         </div>
+        ))}
     </div>
   );
 
@@ -430,6 +225,7 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
             { id: 'OVERVIEW', label: 'HUB', icon: Activity, color: 'text-spartan-red' },
             { id: 'AUDIT', label: 'AUDIT', icon: ShieldAlert, color: 'text-spartan-red' },
             { id: 'MISSIONS', label: 'MISSIONS', icon: Target, color: 'text-cyber-purple' },
+            { id: 'PROTOCOLS', label: 'DIRECTIVES', icon: ListChecks, color: 'text-electric-blue' },
             { id: 'KNOWLEDGE', label: 'INTEL', icon: Info, color: 'text-gold' }
           ].map(tab => (
             <button 
@@ -443,23 +239,218 @@ export const SpartanVessel: React.FC<Props> = ({ habits, profile, toggleHabit, u
         </div>
       </header>
 
-      {activeSubTab === 'OVERVIEW' && renderOverview()}
-      {activeSubTab === 'AUDIT' && renderAudit()}
-      {activeSubTab === 'MISSIONS' && renderMissions()}
-      {activeSubTab === 'KNOWLEDGE' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Object.entries(HEALTH_KNOWLEDGE_BASE).map(([key, value]) => (
-            <div key={key} className="glass-panel p-8 rounded-[3rem] border border-white/5 bg-black/40 shadow-xl group hover:border-blue-400/30 transition-all">
-                <h4 className="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                <Info size={16}/> {key}
-                </h4>
-                <p className="text-xs text-gray-300 leading-relaxed font-medium">
-                {value}
-                </p>
+      {activeSubTab === 'OVERVIEW' && (
+        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 glass-panel p-10 rounded-[3.5rem] border-t-4 border-spartan-red shadow-4xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-12 opacity-[0.03] rotate-12 group-hover:rotate-0 transition-transform duration-1000">
+                <Dna size={400} className="text-spartan-red" />
+              </div>
+              <div className="flex flex-col md:flex-row gap-10 relative z-10 items-center">
+                <div className="relative">
+                  <div className="w-48 h-48 rounded-full border-8 border-spartan-red/10 flex items-center justify-center relative shadow-[inset_0_0_50px_rgba(255,42,42,0.1)]">
+                    <div className="absolute inset-0 border-t-8 border-spartan-red rounded-full animate-[spin_6s_linear_infinite]"></div>
+                    <div className="text-center">
+                      <p className="text-6xl font-mono font-black text-white text-glow-red leading-none">{retention.day}</p>
+                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-1">Days Deep</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-4 text-center md:text-left">
+                  <div className="flex items-center justify-center md:justify-start gap-4">
+                    <Flame className="text-spartan-red animate-pulse" size={28}/>
+                    <h3 className={`text-2xl font-display font-black uppercase italic ${retention.phase.color}`}>{retention.phase.title}</h3>
+                  </div>
+                  <p className="text-gray-400 text-sm leading-relaxed italic bg-white/5 p-4 rounded-2xl border border-white/5">
+                    {retention.phase.desc}
+                  </p>
+                  <div className="pt-4 space-y-2">
+                    <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                      <span>Phase Velocity</span>
+                      <span>Target: {retention.nextPhase?.day || 'MAX'} Days</span>
+                    </div>
+                    <div className="h-2.5 bg-obsidian rounded-full overflow-hidden border border-white/5">
+                      <div className="h-full bg-gradient-to-r from-spartan-red to-gold shadow-[0_0_15px_rgba(255,42,42,0.5)] transition-all duration-1000" 
+                           style={{width: `${Math.min(100, (retention.day / (retention.nextPhase?.day || 90)) * 100)}%`}}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            ))}
+
+            <div className="glass-panel p-10 rounded-[3.5rem] border border-white/5 bg-gradient-to-br from-black/40 to-transparent flex flex-col justify-between shadow-2xl relative overflow-hidden group">
+              <div className="absolute -bottom-10 -right-10 opacity-[0.05] group-hover:scale-110 transition-transform">
+                <Clock size={200} className="text-white"/>
+              </div>
+              <div className="space-y-6 relative z-10">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Circadian Sync</h4>
+                  <span className="text-xs font-mono font-black text-white">{currentTime.toLocaleTimeString([], { hour12: false })}</span>
+                </div>
+                <div className="bg-black/40 border border-white/5 p-8 rounded-[2.5rem] text-center">
+                  <circadianStatus.icon size={36} className={`${circadianStatus.color} mx-auto mb-4 animate-pulse`} />
+                  <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Bio-Triage Mode</p>
+                  <p className="text-2xl font-display font-black text-white uppercase italic tracking-tighter">{circadianStatus.label}</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveSubTab('AUDIT')} className="w-full mt-8 py-4 bg-white/5 border border-white/10 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all relative z-10">Run Bio-Vitals Scan</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {spartanHabits.map(habit => {
+              const isDoneToday = habit.lastCompleted === todayStr;
+              return (
+                <div key={habit.id} className="relative group">
+                    <div className={`glass-panel p-8 rounded-[2.5rem] border transition-all flex flex-col items-center gap-4 text-center ${isDoneToday ? 'border-wealth-green bg-wealth-green/10 shadow-[0_0_30px_rgba(0,230,118,0.1)]' : 'border-white/5 bg-black/40 hover:border-white/20'}`}>
+                        <div className="flex justify-between w-full mb-2">
+                            <button onClick={() => setDetailedHabitId(habit.id)} className="p-2 text-gray-600 hover:text-white transition-colors bg-white/5 rounded-lg"><BarChart3 size={16}/></button>
+                            <button onClick={() => setDetailedHabitId(habit.id)} className="p-2 text-gray-600 hover:text-white transition-colors bg-white/5 rounded-lg"><Settings2 size={16}/></button>
+                        </div>
+                        <button 
+                            onClick={() => toggleHabit(habit.id)}
+                            className={`w-20 h-20 rounded-[2.2rem] transition-all shadow-2xl flex items-center justify-center ${isDoneToday ? 'bg-wealth-green text-black' : 'bg-white/5 text-gray-600 hover:text-white'}`}
+                        >
+                            {habit.isRetentionHabit ? <Flame size={40}/> : <Zap size={40}/>}
+                        </button>
+                        <div>
+                            <p className="text-[14px] font-black text-white uppercase tracking-tight">{habit.name}</p>
+                            <div className="flex items-center justify-center gap-2 mt-2">
+                                 <TrendingUp size={14} className="text-wealth-green"/>
+                                 <span className="text-[11px] font-mono font-black text-white tracking-widest">{habit.streak} DAY STREAK</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {detailedHabitId && (() => {
+              const habit = habits.find(h => h.id === detailedHabitId);
+              if (!habit) return null;
+              const historyGrid = generateHistoryGrid(habit.history);
+              return (
+                  <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/95 backdrop-blur-3xl animate-in fade-in">
+                      <div className="glass-panel w-full max-w-2xl p-10 lg:p-16 rounded-[4rem] border border-white/10 shadow-5xl relative overflow-hidden">
+                          <div className="absolute top-0 right-0 p-12 opacity-[0.03]"><Settings2 size={300}/></div>
+                          <div className="flex justify-between items-start relative z-10 mb-12">
+                              <div>
+                                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.5em] mb-2">Neural Habit Analytics</p>
+                                  <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter">{habit.name}</h3>
+                              </div>
+                              <button onClick={() => setDetailedHabitId(null)} className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 text-gray-500 hover:text-white transition-all"><X size={24}/></button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
+                              <div className="space-y-8">
+                                  <div className="p-8 bg-black/60 rounded-[2.5rem] border border-white/5 shadow-inner">
+                                      <div className="flex items-center gap-4 mb-6">
+                                          <div className="p-3 bg-spartan-red/10 text-spartan-red rounded-xl"><Activity size={20}/></div>
+                                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Streak Strength</p>
+                                      </div>
+                                      <div className="flex items-baseline gap-2">
+                                          <span className="text-5xl font-mono font-black text-white">{habit.streak}</span>
+                                          <span className="text-sm font-black text-gray-600 uppercase tracking-widest">Days</span>
+                                      </div>
+                                  </div>
+                                  <div className="p-8 bg-black/60 rounded-[2.5rem] border border-white/5 shadow-inner">
+                                      <div className="flex items-center gap-4 mb-6">
+                                          <div className="p-3 bg-electric-blue/10 text-electric-blue rounded-xl"><Clock size={20}/></div>
+                                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Directive</p>
+                                      </div>
+                                      <div className="space-y-4">
+                                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest block ml-2">Reminder Protocol</label>
+                                          <input 
+                                              type="time" 
+                                              value={habit.reminderTime || "00:00"}
+                                              onChange={(e) => setHabitReminder(habit.id, e.target.value)}
+                                              className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white font-mono text-xl outline-none focus:border-wealth-green shadow-inner"
+                                          />
+                                      </div>
+                                  </div>
+                              </div>
+                              <div className="p-8 bg-black/60 rounded-[2.5rem] border border-white/5 shadow-inner flex flex-col h-full">
+                                  <div className="flex items-center gap-4 mb-8">
+                                      <div className="p-3 bg-wealth-green/10 text-wealth-green rounded-xl"><Calendar size={20}/></div>
+                                      <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">35-Day Matrix</p>
+                                  </div>
+                                  <div className="grid grid-cols-7 gap-2 flex-1 items-center">
+                                      {historyGrid.map((day, idx) => (
+                                          <div key={idx} title={day.date} className={`aspect-square rounded-lg transition-all duration-500 border ${day.isToday ? 'border-white/40 scale-110 z-10' : 'border-transparent'} ${day.isDone ? 'bg-wealth-green shadow-[0_0_10px_rgba(0,230,118,0.4)]' : 'bg-white/5'}`} />
+                                      ))}
+                                  </div>
+                              </div>
+                          </div>
+                          <button onClick={() => setDetailedHabitId(null)} className="w-full mt-12 py-6 bg-white text-black font-black uppercase tracking-[0.5em] rounded-[2.5rem] text-[11px] shadow-5xl hover:scale-[1.02] active:scale-95 transition-all">CLOSE</button>
+                      </div>
+                  </div>
+              );
+          })()}
         </div>
       )}
+
+      {activeSubTab === 'AUDIT' && (
+        <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-8 duration-700">
+            <div className="glass-panel p-12 lg:p-20 rounded-[4rem] lg:rounded-[5rem] border border-white/10 bg-gradient-to-br from-black/60 to-black/20 shadow-5xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none"><Activity size={400}/></div>
+                <div className="flex items-center gap-8 mb-16 border-b border-white/5 pb-10 relative z-10">
+                    <div className="p-6 bg-spartan-red/20 text-spartan-red rounded-[2.5rem] shadow-4xl"><Activity size={48}/></div>
+                    <div>
+                        <h3 className="text-4xl font-display font-black text-white uppercase italic tracking-tighter">Bio-Vitals Triage</h3>
+                        <p className="text-[11px] text-gray-500 font-mono uppercase tracking-[0.5em] font-black">System Integrity Check</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
+                    <div className="space-y-4">
+                        <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Scale size={18} className="text-spartan-red"/> Mass (KG)</label>
+                        <input type="number" value={vitalForm.weight} onChange={e => setVitalForm({...vitalForm, weight: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-8 text-3xl font-mono font-black text-white outline-none focus:border-spartan-red shadow-inner" placeholder="0.0" />
+                    </div>
+                    <div className="space-y-4">
+                        <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><TrendingUp size={18} className="text-spartan-red"/> Lipid Density %</label>
+                        <input type="number" value={vitalForm.bodyFat} onChange={e => setVitalForm({...vitalForm, bodyFat: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-8 text-3xl font-mono font-black text-white outline-none focus:border-spartan-red shadow-inner" placeholder="0.0" />
+                    </div>
+                    <div className="space-y-4 md:col-span-2">
+                        <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Moon size={18} className="text-electric-blue"/> Recovery (Hrs)</label>
+                        <input type="number" value={vitalForm.sleepHours} onChange={e => setVitalForm({...vitalForm, sleepHours: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-8 text-3xl font-mono font-black text-white outline-none focus:border-electric-blue shadow-inner" placeholder="0.0" />
+                    </div>
+                </div>
+                <button onClick={handleVitalsSubmit} className="w-full mt-16 py-8 bg-spartan-red text-white font-black uppercase tracking-[0.6em] rounded-[3rem] text-sm shadow-[0_30_60_rgba(255,42,42,0.3)] hover:scale-[1.02] active:scale-95 transition-all">COMMIT SCAN</button>
+            </div>
+        </div>
+      )}
+
+      {activeSubTab === 'MISSIONS' && (
+        <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-8 duration-700">
+            <div className="glass-panel p-12 lg:p-20 rounded-[4rem] lg:rounded-[5rem] border border-white/10 bg-gradient-to-br from-black/60 to-black/20 shadow-5xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none"><Target size={400} className="text-cyber-purple"/></div>
+                <div className="flex items-center gap-8 mb-16 border-b border-white/5 pb-10 relative z-10">
+                    <div className="p-6 bg-cyber-purple/20 text-cyber-purple rounded-[2.5rem] shadow-4xl"><Target size={48}/></div>
+                    <div>
+                        <h3 className="text-4xl font-display font-black text-white uppercase italic tracking-tighter">Mission Calibration</h3>
+                        <p className="text-[11px] text-gray-500 font-mono uppercase tracking-[0.5em] font-black">Strategic Directives</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
+                    <div className="space-y-4 md:col-span-2">
+                        <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Activity size={18} className="text-cyber-purple"/> Name</label>
+                        <input type="text" value={goalForm.name} onChange={e => setGoalForm({...goalForm, name: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-xl font-mono font-black text-white outline-none focus:border-cyber-purple shadow-inner" placeholder="e.g. COMPLETE 90-DAY RETENTION" />
+                    </div>
+                    <div className="space-y-4">
+                        <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Calendar size={18} className="text-electric-blue"/> Start Date</label>
+                        <input type="date" value={goalForm.startDate} onChange={e => setGoalForm({...goalForm, startDate: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-black text-white outline-none focus:border-electric-blue shadow-inner" />
+                    </div>
+                    <div className="space-y-4">
+                        <label className="text-[12px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Target size={18} className="text-spartan-red"/> Target Date</label>
+                        <input type="date" value={goalForm.targetDate} onChange={e => setGoalForm({...goalForm, targetDate: e.target.value})} className="w-full bg-black/60 border border-white/10 rounded-[2rem] p-6 text-sm font-mono font-black text-white outline-none focus:border-spartan-red shadow-inner" />
+                    </div>
+                </div>
+                <button onClick={handleGoalSubmit} className="w-full mt-16 py-8 bg-cyber-purple text-white font-black uppercase tracking-[0.6em] rounded-[3rem] text-sm shadow-5xl hover:scale-[1.02] active:scale-95 transition-all">AUTHORIZE MISSION</button>
+            </div>
+        </div>
+      )}
+
+      {activeSubTab === 'PROTOCOLS' && renderProtocols()}
+      {activeSubTab === 'KNOWLEDGE' && renderKnowledge()}
     </div>
   );
 };

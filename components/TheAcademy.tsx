@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Terminal, CheckCircle2, Circle, Clock, Zap, Target, Brain, Scroll, 
   ArrowRight, Play, Pause, RotateCcw, Plus, X, AlignLeft,
   Maximize2, ShieldAlert, Award, Compass, Calculator,
   ExternalLink, BarChart3, Scale, Timer, Cpu, ShieldCheck, 
-  Maximize, Minimize, Trash2, Edit3, CheckCircle
+  Maximize, Minimize, Trash2, Edit3, Volume2, VolumeX, Music,
+  Coffee, Activity, FastForward, Settings2, Sliders, Headphones
 } from 'lucide-react';
 import { STUDY_PHASES, RULES_OF_POWER_13, RICH_VS_POOR_MINDSET } from '../constants';
 import { JournalTask } from '../types';
@@ -15,7 +16,14 @@ interface Props {
     setObjectives: (objs: JournalTask[]) => void;
 }
 
-type TimerMode = 'POMO' | '52_17' | 'ULTRADIAN';
+type TimerMode = 'POMO' | '52_17' | 'ULTRADIAN' | 'FLOW' | 'BREAK';
+
+const SOUNDSCAPES = [
+    { id: 'none', label: 'SILENCE', url: '' },
+    { id: 'alpha', label: 'ALPHA WAVES', url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a1b1b1b1.mp3?filename=deep-meditation-11000.mp3' },
+    { id: 'white', label: 'WHITE NOISE', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+    { id: 'lofi', label: 'LOFI FOCUS', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' }
+];
 
 export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
   const [activeTab, setActiveTab] = useState<'DEEP_WORK' | 'PROTOCOLS' | 'WISDOM' | 'DECISION'>('DEEP_WORK');
@@ -25,9 +33,25 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
   const [mode, setMode] = useState<TimerMode>('POMO');
   const [isRunning, setIsRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [activeTask, setActiveTask] = useState<string>(objectives[0]?.task || 'Neural Lockdown Initiated...');
+  const [totalSeconds, setTotalSeconds] = useState(25 * 60);
+  const [activeTask, setActiveTask] = useState<string>(objectives[0]?.task || 'Choose a goal to start focus...');
+  
+  // --- CUSTOMIZATION ---
+  const [customDurations, setCustomDurations] = useState({
+    POMO: 25,
+    '52_17': 52,
+    ULTRADIAN: 90,
+    FLOW: 120,
+    BREAK: 5
+  });
+  
+  // --- SOUNDS ---
+  const [activeSound, setActiveSound] = useState(SOUNDSCAPES[0]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [sessionStats, setSessionStats] = useState({ completedSessions: 0, totalMinutes: 0 });
 
-  // --- EDIT MODAL STATE ---
+  // --- MODAL STATE ---
+  const [showSettings, setShowSettings] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Partial<JournalTask> | null>(null);
 
@@ -35,50 +59,63 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
     let interval: any;
     if (isRunning && timeLeft > 0) {
         interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-    } else if (timeLeft === 0) {
-        setIsRunning(false);
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.play().catch(() => {});
-        alert("COMMAND: Focus Session Concluded. Authorizing 5-minute Neural Cool-down.");
+    } else if (timeLeft === 0 && isRunning) {
+        handleSessionEnd();
     }
     return () => clearInterval(interval);
   }, [isRunning, timeLeft]);
 
-  const handleModeChange = (newMode: TimerMode) => {
-      setIsRunning(false);
-      setMode(newMode);
-      switch(newMode) {
-          case 'POMO': setTimeLeft(25 * 60); break;
-          case '52_17': setTimeLeft(52 * 60); break;
-          case 'ULTRADIAN': setTimeLeft(90 * 60); break;
-      }
-  };
+  // Audio handling
+  useEffect(() => {
+    if (audioRef.current) {
+        if (isRunning && activeSound.url) {
+            audioRef.current.play().catch(() => {});
+        } else {
+            audioRef.current.pause();
+        }
+    }
+  }, [isRunning, activeSound]);
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const deleteTask = (id: string) => {
-    if (window.confirm("Authorize Deletion of Mission Vector?")) {
-        setObjectives(objectives.filter(o => o.id !== id));
+  const handleSessionEnd = () => {
+    setIsRunning(false);
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    audio.play().catch(() => {});
+    
+    if (mode !== 'BREAK') {
+        setSessionStats(prev => ({ 
+            completedSessions: prev.completedSessions + 1, 
+            totalMinutes: prev.totalMinutes + Math.floor(totalSeconds / 60) 
+        }));
+        setMode('BREAK');
+        const breakDur = customDurations.BREAK * 60;
+        setTimeLeft(breakDur);
+        setTotalSeconds(breakDur);
+        alert("Focus Session Complete. Take a human break.");
+    } else {
+        handleModeChange('POMO');
+        alert("Break ended. Ready to re-engage?");
     }
   };
 
-  const toggleTaskStatus = (id: string) => {
-    setObjectives(objectives.map(o => {
-        if (o.id === id) {
-            const isDone = o.status === 'Completed';
-            return { 
-                ...o, 
-                status: isDone ? 'Pending' : 'Completed',
-                completionDate: isDone ? undefined : new Date().toISOString()
-            };
-        }
-        return o;
-    }));
+  const handleModeChange = (newMode: TimerMode) => {
+      setIsRunning(false);
+      setMode(newMode);
+      const duration = customDurations[newMode as keyof typeof customDurations] * 60;
+      setTimeLeft(duration);
+      setTotalSeconds(duration);
   };
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const progress = useMemo(() => {
+      return ((totalSeconds - timeLeft) / (totalSeconds || 1)) * 100;
+  }, [timeLeft, totalSeconds]);
 
   const saveTaskUpdate = () => {
     if (!editingTask?.task) return;
@@ -87,15 +124,13 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
     } else {
         const newTask: JournalTask = {
             id: Date.now().toString(),
-            category: 'Strategic',
+            category: 'Study',
             task: editingTask.task!,
             status: 'Not Started',
             priority: editingTask.priority || 'Medium',
             progress: 0,
             notes: editingTask.notes || '',
             dueDate: editingTask.dueDate || new Date().toISOString(),
-            validityYears: editingTask.validityYears || 0,
-            reminderDays: editingTask.reminderDays || 60
         };
         setObjectives([...objectives, newTask]);
     }
@@ -104,62 +139,82 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
   };
 
   return (
-    <div className="space-y-16 pb-48 max-w-[1400px] mx-auto animate-in fade-in duration-1000">
-       {/* FULL SCREEN OVERLAY */}
+    <div className={`space-y-12 pb-40 max-w-[1400px] mx-auto animate-in fade-in duration-1000 ${isFullScreen ? 'overflow-hidden' : ''}`}>
+       
+       <audio ref={audioRef} src={activeSound.url} loop />
+
+       {/* FULL SCREEN ISOLATION MODE */}
        {isFullScreen && (
-           <div className="fixed inset-0 z-[9999] bg-obsidian flex flex-col items-center justify-center p-10 animate-in fade-in zoom-in duration-500">
-                <div className="absolute top-10 right-10">
+           <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-10 animate-in fade-in zoom-in duration-500">
+                <div className="absolute top-10 right-10 flex gap-4">
                     <button 
                         onClick={() => setIsFullScreen(false)} 
                         className="p-6 bg-white/5 hover:bg-white/10 rounded-full text-gray-500 hover:text-white transition-all border border-white/10"
+                        title="Exit Full Screen"
                     >
-                        <Minimize size={40}/>
+                        <Minimize size={32}/>
                     </button>
                 </div>
                 
-                <div className="text-center space-y-10">
-                    <p className="text-[12px] font-mono text-spartan-red uppercase tracking-[1.5em] animate-pulse">:: Neural Isolation Active ::</p>
-                    <h2 className="text-4xl md:text-6xl font-display font-black text-white uppercase italic tracking-tighter text-glow-red opacity-80">{activeTask}</h2>
+                <div className="text-center space-y-12 relative z-10 w-full max-w-4xl">
+                    <p className={`text-[12px] font-mono uppercase tracking-[1.5em] animate-pulse ${mode === 'BREAK' ? 'text-wealth-green' : 'text-spartan-red'}`}>
+                        {mode === 'BREAK' ? ':: RECOVERY PHASE ::' : ':: ISOLATION ACTIVE ::'}
+                    </p>
+                    <h2 className="text-5xl md:text-7xl font-display font-black text-white uppercase italic tracking-tighter text-glow-red opacity-90 px-4">{activeTask}</h2>
                     
-                    <div className="text-[15rem] md:text-[25rem] font-mono font-black text-white text-glow-blue leading-none tracking-tighter transition-all duration-700 hover:scale-105 select-none cursor-default">
-                        {formatTime(timeLeft)}
+                    <div className="relative flex items-center justify-center py-10">
+                        <svg className="w-[350px] h-[350px] md:w-[650px] md:h-[650px] rotate-[-90deg]">
+                            <circle cx="50%" cy="50%" r="48%" stroke="rgba(255,255,255,0.03)" strokeWidth="4" fill="transparent" />
+                            <circle cx="50%" cy="50%" r="48%" stroke={mode === 'BREAK' ? '#00E676' : '#FF2A2A'} strokeWidth="10" fill="transparent" 
+                                    strokeDasharray="2100" strokeDashoffset={2100 - (2100 * progress / 100)} 
+                                    className="transition-all duration-1000 ease-linear shadow-[0_0_40px_rgba(255,42,42,0.3)]" />
+                        </svg>
+                        <div className="absolute text-[12rem] md:text-[22rem] font-mono font-black text-white text-glow-blue leading-none tracking-tighter tabular-nums select-none">
+                            {formatTime(timeLeft)}
+                        </div>
                     </div>
                     
-                    <div className="flex gap-8 justify-center">
+                    <div className="flex gap-10 justify-center items-center">
                          <button 
                             onClick={() => setIsRunning(!isRunning)} 
-                            className={`flex items-center gap-6 px-24 py-8 rounded-[3rem] font-black uppercase tracking-[0.6em] transition-all shadow-5xl transform hover:translate-y-[-8px] active:scale-95 ${isRunning ? 'bg-spartan-red text-white' : 'bg-wealth-green text-black'}`}
+                            className={`flex items-center justify-center w-24 h-24 rounded-full transition-all shadow-5xl transform hover:scale-110 active:scale-95 ${isRunning ? 'bg-spartan-red text-white' : 'bg-wealth-green text-black'}`}
                           >
-                              {isRunning ? <><Pause size={32}/> Pause</> : <><Play size={32}/> Engage</>}
+                              {isRunning ? <Pause size={48}/> : <Play size={48} className="ml-2"/>}
                           </button>
                           <button 
                             onClick={() => { setIsRunning(false); handleModeChange(mode); }} 
-                            className="p-8 bg-white/5 border border-white/10 rounded-full text-gray-600 hover:text-white transition-all"
+                            className="w-20 h-20 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all"
                           >
                             <RotateCcw size={32}/>
                           </button>
                     </div>
                 </div>
 
-                {/* Subtle Breathing Glow */}
-                <div className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${isRunning ? 'opacity-20' : 'opacity-5'}`}>
-                    <div className="w-full h-full bg-gradient-radial from-electric-blue/20 to-transparent animate-pulse"></div>
+                <div className="absolute bottom-20 flex gap-6">
+                    {SOUNDSCAPES.map(s => (
+                        <button 
+                            key={s.id} 
+                            onClick={() => setActiveSound(s)}
+                            className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${activeSound.id === s.id ? 'bg-white text-black border-white' : 'bg-white/5 border-white/5 text-gray-600'}`}
+                        >
+                            {s.label}
+                        </button>
+                    ))}
                 </div>
            </div>
        )}
 
-       {/* NAVIGATION TABS */}
-       <div className="flex flex-wrap gap-6 border-b border-white/5 pb-12">
+       <div className="flex flex-wrap gap-4 border-b border-white/5 pb-10">
           {[
-            { id: 'DEEP_WORK', label: 'Neural Focus', icon: Timer },
-            { id: 'PROTOCOLS', label: 'Operating Systems', icon: Cpu },
-            { id: 'WISDOM', label: 'The Codex', icon: Scroll },
-            { id: 'DECISION', label: 'Decision Lab', icon: Scale }
+            { id: 'DEEP_WORK', label: 'Focus Timer', icon: Timer },
+            { id: 'PROTOCOLS', label: 'Study Methods', icon: Cpu },
+            { id: 'WISDOM', label: 'Empire Wisdom', icon: Scroll },
+            { id: 'DECISION', label: 'Problem Solving', icon: Scale }
           ].map(t => (
               <button 
                 key={t.id} 
                 onClick={() => setActiveTab(t.id as any)} 
-                className={`flex items-center gap-4 px-10 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.3em] border-2 transition-all shadow-2xl ${activeTab === t.id ? 'bg-white text-black border-white scale-105' : 'bg-black border-white/10 text-gray-600 hover:text-white hover:border-white/30'}`}
+                className={`flex items-center gap-4 px-8 py-4 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest border-2 transition-all ${activeTab === t.id ? 'bg-white text-black border-white shadow-2xl scale-105' : 'bg-black border-white/10 text-gray-500 hover:text-white'}`}
               >
                 <t.icon size={18} />
                 {t.label}
@@ -167,13 +222,138 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
           ))}
        </div>
 
-       {/* DEEP WORK TIMER SECTION */}
        {activeTab === 'DEEP_WORK' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in slide-in-from-bottom-8 duration-700">
-              {/* MISSION LIST SECTION */}
-              <div className="lg:col-span-4 glass-panel p-12 rounded-[3.5rem] bg-black/40 h-fit border border-white/5 shadow-4xl relative overflow-hidden">
-                  <div className="flex justify-between items-center mb-10 relative z-10">
-                      <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] flex items-center gap-3"><Terminal size={14}/> Frontier List</h3>
+              {/* SIDEBAR: SOUNDS & STATS */}
+              <div className="lg:col-span-3 space-y-8">
+                  <div className="glass-panel p-8 rounded-[2.5rem] border border-white/5 bg-black/40 space-y-8">
+                      <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-3"><Activity size={14}/> Today's Stats</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="p-5 bg-white/5 rounded-2xl border border-white/5 text-center">
+                              <p className="text-[8px] font-black text-gray-600 uppercase mb-1">Sessions</p>
+                              <p className="text-2xl font-mono font-black text-white">{sessionStats.completedSessions}</p>
+                          </div>
+                          <div className="p-5 bg-white/5 rounded-2xl border border-white/5 text-center">
+                              <p className="text-[8px] font-black text-gray-600 uppercase mb-1">Minutes</p>
+                              <p className="text-2xl font-mono font-black text-wealth-green">{sessionStats.totalMinutes}</p>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="glass-panel p-8 rounded-[2.5rem] border border-white/5 bg-black/40 space-y-6">
+                      <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-3"><Headphones size={14}/> Brain Booster Sounds</h3>
+                      <div className="space-y-2">
+                          {SOUNDSCAPES.map(s => (
+                              <button 
+                                key={s.id} 
+                                onClick={() => setActiveSound(s)}
+                                className={`w-full p-4 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center justify-between ${activeSound.id === s.id ? 'bg-white text-black border-white' : 'bg-white/5 border-white/5 text-gray-500 hover:text-white'}`}
+                              >
+                                  {s.label}
+                                  {activeSound.id === s.id && isRunning && <Zap size={10} className="animate-pulse text-spartan-red" />}
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+
+              {/* TIMER MAIN */}
+              <div className="lg:col-span-6 glass-panel p-12 rounded-[4rem] border border-white/5 bg-gradient-to-br from-black/60 to-black/20 flex flex-col items-center justify-center text-center shadow-4xl relative overflow-hidden group min-h-[600px]">
+                  <div className="absolute top-10 right-10 z-20 flex gap-2">
+                    <button 
+                        onClick={() => setShowSettings(!showSettings)}
+                        className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 text-gray-500 hover:text-white transition-all"
+                        title="Customize Durations"
+                    >
+                        <Settings2 size={20}/>
+                    </button>
+                    <button 
+                        onClick={() => setIsFullScreen(true)}
+                        className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 text-gray-500 hover:text-white transition-all flex items-center gap-3"
+                    >
+                        <Maximize size={20}/>
+                    </button>
+                  </div>
+                  
+                  <div className="relative flex items-center justify-center mb-10 w-full">
+                      <svg className="w-[320px] h-[320px] rotate-[-90deg]">
+                          <circle cx="50%" cy="50%" r="45%" stroke="rgba(255,255,255,0.03)" strokeWidth="5" fill="transparent" />
+                          <circle cx="50%" cy="50%" r="45%" stroke={mode === 'BREAK' ? '#00E676' : '#FF2A2A'} strokeWidth="8" fill="transparent" 
+                                  strokeDasharray="1000" strokeDashoffset={1000 - (1000 * progress / 100)} 
+                                  className="transition-all duration-1000 ease-linear" />
+                      </svg>
+                      <div className="absolute">
+                          <p className={`text-[10px] font-mono uppercase tracking-[0.8em] mb-4 animate-pulse ${mode === 'BREAK' ? 'text-wealth-green' : 'text-gray-600'}`}>
+                            {mode === 'BREAK' ? 'RECOVERY' : 'FOCUS'}
+                          </p>
+                          <h2 className="text-[7rem] font-mono font-black text-white text-glow-blue leading-none tracking-tighter tabular-nums">
+                            {formatTime(timeLeft)}
+                          </h2>
+                      </div>
+                  </div>
+                  
+                  <div className="space-y-8 relative z-10 w-full px-6">
+                      <h2 className="text-2xl font-display font-black text-white uppercase italic tracking-tighter drop-shadow-xl">{activeTask}</h2>
+                      
+                      <div className="flex flex-col gap-8">
+                          <div className="flex justify-center bg-black/60 p-1.5 rounded-[2.2rem] border border-white/10 w-fit mx-auto shadow-inner">
+                              {['POMO', '52_17', 'ULTRADIAN', 'FLOW', 'BREAK'].map(m => (
+                                  <button key={m} onClick={() => handleModeChange(m as any)} className={`px-6 py-2.5 rounded-[1.5rem] text-[9px] font-black uppercase transition-all ${mode === m ? 'bg-white text-black shadow-2xl' : 'text-gray-500 hover:text-white'}`}>
+                                    {m === 'BREAK' ? 'Break' : m.replace('_', '/')}
+                                  </button>
+                              ))}
+                          </div>
+                          <div className="flex gap-4 justify-center">
+                            <button 
+                              onClick={() => setIsRunning(!isRunning)} 
+                              className={`flex items-center gap-5 px-14 py-6 rounded-[2.2rem] font-black uppercase tracking-[0.4em] transition-all shadow-4xl transform hover:translate-y-[-4px] active:scale-95 ${isRunning ? 'bg-spartan-red text-white shadow-red-900/20' : 'bg-wealth-green text-black shadow-green-900/20'}`}
+                            >
+                                {isRunning ? <><Pause size={24}/> Pause</> : <><Play size={24}/> Start Focus</>}
+                            </button>
+                            <button 
+                              onClick={() => { setIsRunning(false); handleModeChange(mode); }} 
+                              className="p-6 bg-white/5 border border-white/10 rounded-[2.2rem] text-gray-600 hover:text-white transition-all"
+                            >
+                              <RotateCcw size={24}/>
+                            </button>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* SETTINGS INLINE OVERLAY */}
+                  {showSettings && (
+                      <div className="absolute inset-0 z-30 bg-black/95 p-12 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                          <div className="w-full max-w-sm space-y-8">
+                              <h4 className="text-xl font-black text-white uppercase tracking-widest mb-8">Customize Durations</h4>
+                              {Object.entries(customDurations).map(([k, v]) => (
+                                  <div key={k} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
+                                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{k.replace('_', '/')}</span>
+                                      <div className="flex items-center gap-4">
+                                          <input 
+                                              type="number" 
+                                              value={v} 
+                                              onChange={(e) => setCustomDurations({...customDurations, [k]: parseInt(e.target.value) || 1})}
+                                              className="w-16 bg-black border border-white/10 rounded-xl p-2 text-white font-mono text-center text-sm outline-none focus:border-wealth-green"
+                                          />
+                                          <span className="text-[9px] font-black text-gray-700">MIN</span>
+                                      </div>
+                                  </div>
+                              ))}
+                              <button 
+                                onClick={() => { setShowSettings(false); handleModeChange(mode); }}
+                                className="w-full py-5 bg-wealth-green text-black font-black uppercase tracking-[0.4em] rounded-2xl text-xs hover:scale-105 transition-all"
+                              >
+                                Save Changes
+                              </button>
+                          </div>
+                      </div>
+                  )}
+              </div>
+
+              {/* MISSION QUEUE SIDEBAR */}
+              <div className="lg:col-span-3 glass-panel p-8 rounded-[2.5rem] bg-black/40 h-fit border border-white/5">
+                  <div className="flex justify-between items-center mb-8">
+                      <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-3"><Terminal size={14}/> Goal Queue</h3>
                       <button 
                         onClick={() => { setEditingTask({}); setShowEditModal(true); }}
                         className="p-3 bg-white/5 hover:bg-white/10 rounded-xl text-gray-500 hover:text-white transition-all"
@@ -182,123 +362,47 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
                       </button>
                   </div>
                   
-                  <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-2 relative z-10">
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                       {objectives.filter(o => o.status !== 'Completed').map(obj => (
                           <div 
                             key={obj.id} 
-                            className={`group relative p-6 rounded-[2rem] border transition-all cursor-pointer ${activeTask === obj.task ? 'bg-cyber-purple/10 border-cyber-purple/40 shadow-[0_0_30px_rgba(213,0,249,0.1)]' : 'bg-black border-white/5 hover:border-white/20'}`}
+                            className={`group relative p-5 rounded-2xl border transition-all cursor-pointer ${activeTask === obj.task ? 'bg-cyber-purple/10 border-cyber-purple/40' : 'bg-black border-white/5 hover:border-white/15'}`}
                             onClick={() => setActiveTask(obj.task)}
                           >
-                              <div className="flex justify-between items-start">
-                                  <div className="space-y-1 pr-12">
-                                      <p className={`text-xs font-black uppercase tracking-tight ${activeTask === obj.task ? 'text-white' : 'text-gray-500'}`}>{obj.task}</p>
-                                      <p className="text-[8px] font-mono text-gray-700 uppercase tracking-widest">{obj.priority} Priority</p>
-                                  </div>
-                                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); toggleTaskStatus(obj.id); }} 
-                                        className="p-2 bg-black hover:bg-wealth-green/20 text-gray-700 hover:text-wealth-green rounded-lg"
-                                      >
-                                        <CheckCircle size={14}/>
-                                      </button>
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); setEditingTask(obj); setShowEditModal(true); }} 
-                                        className="p-2 bg-black hover:bg-white/10 text-gray-700 hover:text-white rounded-lg"
-                                      >
-                                        <Edit3 size={14}/>
-                                      </button>
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); deleteTask(obj.id); }} 
-                                        className="p-2 bg-black hover:bg-spartan-red/20 text-gray-700 hover:text-spartan-red rounded-lg"
-                                      >
-                                        <Trash2 size={14}/>
-                                      </button>
-                                  </div>
+                              <p className={`text-[11px] font-bold uppercase tracking-tight line-clamp-2 ${activeTask === obj.task ? 'text-white' : 'text-gray-500'}`}>{obj.task}</p>
+                              <div className="flex justify-between items-center mt-3">
+                                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${obj.priority === 'Critical' ? 'bg-spartan-red/20 text-spartan-red' : 'bg-white/5 text-gray-700'}`}>{obj.priority}</span>
+                                  {activeTask === obj.task && <div className="w-1.5 h-1.5 bg-cyber-purple rounded-full animate-pulse shadow-[0_0_8px_#D500F9]"></div>}
                               </div>
-                              {activeTask === obj.task && <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyber-purple"></div>}
                           </div>
                       ))}
-                      {objectives.filter(o => o.status !== 'Completed').length === 0 && (
-                          <div className="py-20 text-center opacity-20 italic font-mono text-[10px] uppercase tracking-widest border border-dashed border-white/10 rounded-[2rem]">
-                              NO_ACTIVE_TARGETS_ACQUIRED
-                          </div>
-                      )}
-                  </div>
-              </div>
-
-              {/* TIMER DISPLAY SECTION */}
-              <div className="lg:col-span-8 glass-panel p-20 rounded-[5rem] border border-white/5 bg-gradient-to-br from-black/60 to-black/20 flex flex-col items-center justify-center text-center shadow-4xl relative overflow-hidden group">
-                  <div className="absolute top-10 right-10 z-20">
-                    <button 
-                        onClick={() => setIsFullScreen(true)}
-                        className="p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] border border-white/10 text-gray-500 hover:text-white transition-all shadow-xl flex items-center gap-3"
-                    >
-                        <Maximize size={18}/> <span className="text-[9px] font-black uppercase tracking-widest">Isolation Mode</span>
-                    </button>
-                  </div>
-                  
-                  <div className="absolute inset-0 bg-cyber-purple/5 opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
-                  <p className="text-[11px] font-mono text-gray-600 uppercase tracking-[1em] mb-12 animate-pulse relative z-10">:: Neural Focus Lock Protocol ::</p>
-                  <h2 className="text-4xl font-display font-black text-white uppercase italic text-glow-blue mb-12 relative z-10 drop-shadow-2xl">{activeTask}</h2>
-                  
-                  <div className="text-[12rem] font-mono font-black text-white text-glow-blue leading-none mb-16 tracking-tighter relative z-10 select-none transition-all duration-700 hover:scale-105">
-                    {formatTime(timeLeft)}
-                  </div>
-                  
-                  <div className="flex flex-col md:flex-row gap-8 relative z-10">
-                      <div className="flex bg-black/60 p-2 rounded-[2.5rem] border border-white/10">
-                          {['POMO', '52_17', 'ULTRADIAN'].map(m => (
-                              <button key={m} onClick={() => handleModeChange(m as any)} className={`px-8 py-3 rounded-[1.8rem] text-[9px] font-black uppercase transition-all ${mode === m ? 'bg-white text-black shadow-2xl' : 'text-gray-500 hover:text-white'}`}>{m.replace('_', '/')}</button>
-                          ))}
-                      </div>
-                      <div className="flex gap-4">
-                        <button 
-                          onClick={() => setIsRunning(!isRunning)} 
-                          className={`flex items-center gap-4 px-16 py-5 rounded-[2.5rem] font-black uppercase tracking-[0.4em] transition-all shadow-4xl transform hover:translate-y-[-4px] active:scale-95 ${isRunning ? 'bg-spartan-red text-white' : 'bg-wealth-green text-black'}`}
-                        >
-                            {isRunning ? <><Pause size={20}/> Pause</> : <><Play size={20}/> Engage Focus</>}
-                        </button>
-                        <button 
-                          onClick={() => { setIsRunning(false); handleModeChange(mode); }} 
-                          className="p-5 bg-white/5 border border-white/10 rounded-[2.5rem] text-gray-600 hover:text-white hover:bg-white/10 transition-all active:rotate-180 duration-500"
-                        >
-                          <RotateCcw size={24}/>
-                        </button>
-                      </div>
                   </div>
               </div>
           </div>
        )}
 
-       {/* EDIT MODAL */}
+       {/* EDIT MODAL (RE-USED) */}
        {showEditModal && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 bg-black/95 backdrop-blur-3xl animate-in fade-in">
-              <div className="glass-panel w-full max-w-xl p-16 rounded-[4.5rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,1)] relative">
-                  <div className="flex justify-between items-center mb-12">
-                      <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter leading-none">
-                        Vector <span className="text-cyber-purple">Calibration</span>
-                      </h3>
-                      <button onClick={() => setShowEditModal(false)} className="p-4 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition-all"><X size={32}/></button>
-                  </div>
-                  
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/95 backdrop-blur-3xl animate-in fade-in">
+              <div className="glass-panel w-full max-w-xl p-16 rounded-[4rem] border border-white/10 relative">
+                  <h3 className="text-3xl font-display font-black text-white uppercase italic tracking-tighter mb-12">New <span className="text-cyber-purple">Focus Goal</span></h3>
                   <div className="space-y-10">
                       <div className="space-y-4">
-                          <label className="text-[11px] font-black text-gray-500 uppercase tracking-[0.4em] ml-4">Directive Identity</label>
+                          <label className="text-[11px] font-black text-gray-500 uppercase tracking-widest ml-4">Goal Name</label>
                           <input 
                             value={editingTask?.task || ''} 
                             onChange={e => setEditingTask({...editingTask, task: e.target.value})} 
-                            placeholder="e.g. ELECTRONICS_II_MASTERY"
-                            className="w-full bg-black border border-white/10 rounded-[2rem] p-8 text-white font-mono text-sm outline-none focus:border-cyber-purple transition-all shadow-inner"
+                            placeholder="e.g. Master React Hooks"
+                            className="w-full bg-black border border-white/10 rounded-[2rem] p-8 text-white font-mono text-sm outline-none focus:border-cyber-purple shadow-inner"
                           />
                       </div>
-                      
                       <div className="grid grid-cols-2 gap-8">
                           <div className="space-y-4">
-                              <label className="text-[11px] font-black text-gray-500 uppercase tracking-[0.4em] ml-4">Priority</label>
+                              <label className="text-[11px] font-black text-gray-500 uppercase tracking-widest ml-4">Priority</label>
                               <select 
                                 value={editingTask?.priority || 'Medium'} 
                                 onChange={e => setEditingTask({...editingTask, priority: e.target.value as any})}
-                                className="w-full bg-black border border-white/10 rounded-[2rem] p-6 text-white font-mono text-xs outline-none focus:border-cyber-purple transition-all shadow-inner"
+                                className="w-full bg-black border border-white/10 rounded-[2rem] p-6 text-white font-mono text-xs outline-none focus:border-cyber-purple appearance-none"
                               >
                                   <option value="Low">Low</option>
                                   <option value="Medium">Medium</option>
@@ -307,22 +411,19 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
                               </select>
                           </div>
                           <div className="space-y-4">
-                              <label className="text-[11px] font-black text-gray-500 uppercase tracking-[0.4em] ml-4">Due Date</label>
+                              <label className="text-[11px] font-black text-gray-500 uppercase tracking-widest ml-4">Due Date</label>
                               <input 
                                 type="date" 
                                 value={editingTask?.dueDate?.split('T')[0] || ''} 
                                 onChange={e => setEditingTask({...editingTask, dueDate: e.target.value + 'T00:00:00'})}
-                                className="w-full bg-black border border-white/10 rounded-[2rem] p-6 text-white font-mono text-xs outline-none focus:border-cyber-purple transition-all shadow-inner"
+                                className="w-full bg-black border border-white/10 rounded-[2rem] p-6 text-white font-mono text-xs outline-none focus:border-cyber-purple"
                               />
                           </div>
                       </div>
-
-                      <button 
-                        onClick={saveTaskUpdate}
-                        className="w-full py-8 bg-cyber-purple text-white font-black uppercase tracking-[0.6em] rounded-[2.5rem] text-sm shadow-3xl hover:scale-[1.01] active:scale-95 transition-all"
-                      >
-                        Authorize Mission Vector
-                      </button>
+                      <div className="flex gap-6">
+                        <button onClick={saveTaskUpdate} className="flex-1 py-6 bg-cyber-purple text-white font-black uppercase tracking-[0.4em] rounded-[2.5rem] text-xs shadow-3xl hover:scale-105 transition-all">Save Goal</button>
+                        <button onClick={() => setShowEditModal(false)} className="px-10 py-6 bg-white/5 border border-white/10 rounded-[2.5rem] text-gray-500 font-black uppercase tracking-widest text-[10px] hover:text-white transition-all">Cancel</button>
+                      </div>
                   </div>
               </div>
           </div>
@@ -412,14 +513,6 @@ export const TheAcademy: React.FC<Props> = ({ objectives, setObjectives }) => {
                                <p className="text-[13px] text-gray-400 font-bold leading-relaxed italic">{box.desc}</p>
                            </div>
                        ))}
-                   </div>
-
-                   <div className="p-12 bg-white/5 rounded-[4rem] border border-dashed border-white/10 flex flex-col md:flex-row items-center gap-12 text-center md:text-left relative z-10">
-                       <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center shadow-inner flex-shrink-0"><Brain size={32} className="text-gray-500" /></div>
-                       <div className="space-y-4">
-                         <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest">Architect's Heuristic</h4>
-                         <p className="text-xl font-bold text-gray-300 italic leading-relaxed">"If it's not a <span className="text-wealth-green">'Hell Yes'</span>, it's a <span className="text-spartan-red">'Hell No'</span>. Avoid the trap of over-optimizing for the short term."</p>
-                       </div>
                    </div>
                </div>
            </div>

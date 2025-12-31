@@ -48,7 +48,7 @@ export const WarRoom: React.FC<Props> = ({ financialData, habits, profile, objec
     setInput('');
     setIsLoading(true);
 
-    const liquidCash = (Number(financialData.bankA) || 0) + (Number(financialData.bankB) || 0) + (Number(financialData.bankC) || 0);
+    const liquidCash = (financialData.accounts || []).reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
     const assetsVal = (financialData.assets || []).reduce((a, b) => a + (Number(b.value) || 0), 0);
     const appState = {
         financial: { liquidCash, netWorth: liquidCash + assetsVal, compounded: financialData.totalCompoundedThisSession },
@@ -108,8 +108,6 @@ export const WarRoom: React.FC<Props> = ({ financialData, habits, profile, objec
                     <div className={`max-w-[85%] md:max-w-[70%] space-y-4 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
                         <div className={`rounded-3xl p-6 border ${msg.role === 'ai' ? 'bg-black/60 border-white/5 text-gray-300' : 'bg-electric-blue/10 border-electric-blue/20 text-white shadow-2xl'}`}>
                             <p className="text-sm leading-relaxed whitespace-pre-wrap font-mono tracking-tight">{msg.content}</p>
-                            
-                            {/* FIXED: Added rendering for search grounding sources as required by guidelines */}
                             {msg.role === 'ai' && msg.sources && msg.sources.length > 0 && (
                                 <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
                                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">

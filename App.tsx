@@ -26,8 +26,27 @@ const App: React.FC = () => {
 
   const [financialData, setFinancialData] = useState<FinancialState>(() => {
     const saved = localStorage.getItem('titan_wealth_v10');
-    return saved ? JSON.parse(saved) : {
-      bankA: 100000, bankB: 250000, bankC: 50000, 
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        // Migration logic: If old bankA exists, convert to accounts array
+        if (!parsed.accounts && (parsed.bankA !== undefined)) {
+            parsed.accounts = [
+                { id: 'a1', name: 'Main Bank', balance: parsed.bankA || 0, type: 'Primary' },
+                { id: 'a2', name: 'Investment Bank', balance: parsed.bankB || 0, type: 'Investment' },
+                { id: 'a3', name: 'Expense Wallet', balance: parsed.bankC || 0, type: 'Daily' }
+            ];
+            delete parsed.bankA;
+            delete parsed.bankB;
+            delete parsed.bankC;
+        }
+        return parsed;
+    }
+    return {
+      accounts: [
+        { id: 'a1', name: 'Main Bank', balance: 100000, type: 'Primary' },
+        { id: 'a2', name: 'Investment Fund', balance: 250000, type: 'Investment' },
+        { id: 'a3', name: 'Daily Cash', balance: 50000, type: 'Daily' }
+      ],
       isStealthMode: false,
       shadowVault: [],
       isShadowVaultLocked: true,
@@ -61,8 +80,50 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : INITIAL_STRATEGIC_OBJECTIVES;
   });
 
+  // EXPORT
+  const exportSoul = () => {
+    const soulData = {
+      profile: userProfile,
+      wealth: financialData,
+      habits: habits,
+      books: books,
+      objectives: objectives,
+      version: "10.GOD",
+      timestamp: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(soulData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `SOVEREIGN_SOUL_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // IMPORT
+  const importSoul = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const soul = JSON.parse(event.target?.result as string);
+        if (soul.profile) setUserProfile(soul.profile);
+        if (soul.wealth) setFinancialData(soul.wealth);
+        if (soul.habits) setHabits(soul.habits);
+        if (soul.books) setBooks(soul.books);
+        if (soul.objectives) setObjectives(soul.objectives);
+        alert("SOUL RESTORED. SYSTEM REBOOTING...");
+        window.location.reload();
+      } catch (err) {
+        alert("CRITICAL ERROR: Soul file corrupted.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   useEffect(() => {
-    const liquidCash = (Number(financialData.bankA) || 0) + (Number(financialData.bankB) || 0) + (Number(financialData.bankC) || 0);
+    const liquidCash = (financialData.accounts || []).reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
     const totalAssetsVal = (financialData.assets || []).reduce((a, b) => a + (Number(b.value) || 0), 0);
     const totalWealth = liquidCash + totalAssetsVal;
     
@@ -72,7 +133,9 @@ const App: React.FC = () => {
     let auditRisk = 0;
     if (userProfile.sleepHours && userProfile.sleepHours < 7) auditRisk += 15;
     if (userProfile.bodyFat && userProfile.bodyFat > 20) auditRisk += 20;
-    if (liquidCash < (financialData.roadmapSettings?.targetMonthlyExpense * 3)) auditRisk += 25;
+    
+    const targetBurn = financialData.roadmapSettings?.targetMonthlyExpense || 40000;
+    if (liquidCash < (targetBurn * 3)) auditRisk += 25;
 
     const calculatedRisk = Math.min(100, 5 + (failedCriticalCount * 20) + auditRisk);
     if (userProfile.systemicRisk !== calculatedRisk) setUserProfile(prev => ({ ...prev, systemicRisk: calculatedRisk }));
@@ -82,7 +145,7 @@ const App: React.FC = () => {
         setFinancialData(prev => ({ ...prev, totalCompoundedThisSession: (prev.totalCompoundedThisSession || 0) + growth }));
     }, 1000);
     return () => clearInterval(interval);
-  }, [financialData.bankA, financialData.bankB, financialData.bankC, financialData.assets, habits, userProfile.sleepHours, financialData.roadmapSettings]);
+  }, [financialData.accounts, financialData.assets, habits, userProfile.sleepHours, financialData.roadmapSettings]);
 
   useEffect(() => {
       localStorage.setItem('titan_wealth_v10', JSON.stringify(financialData));
@@ -99,14 +162,14 @@ const App: React.FC = () => {
 
   const renderSection = () => {
     switch (currentSection) {
-      case AppSection.DASHBOARD: return <Dashboard profile={userProfile} habits={habits} financialData={financialData} objectives={objectives} setObjectives={setObjectives} exportSoul={() => {}} importSoul={() => {}} setSection={setCurrentSection} />;
+      case AppSection.DASHBOARD: return <Dashboard profile={userProfile} habits={habits} financialData={financialData} objectives={objectives} setObjectives={setObjectives} exportSoul={exportSoul} importSoul={importSoul} setSection={setCurrentSection} />;
       case AppSection.WEALTH: return <WealthFortress data={financialData} updateData={setFinancialData} userAge={userProfile.age} setSection={setCurrentSection} />;
       case AppSection.SPARTAN: return <SpartanVessel habits={habits} profile={userProfile} toggleHabit={toggleHabit} updateProfile={setUserProfile} setHabits={setHabits} objectives={objectives} setObjectives={setObjectives} />;
       case AppSection.ACADEMY: return <TheAcademy objectives={objectives} setObjectives={setObjectives} />;
       case AppSection.KNOWLEDGE: return <KnowledgeVault books={books} setBooks={setBooks} />;
       case AppSection.SOCIAL: return <SocialDynamics />;
       case AppSection.WAR_ROOM: return <WarRoom financialData={financialData} habits={habits} profile={userProfile} objectives={objectives} books={books} />;
-      default: return <Dashboard profile={userProfile} habits={habits} financialData={financialData} objectives={objectives} setObjectives={setObjectives} exportSoul={() => {}} importSoul={() => {}} setSection={setCurrentSection} />;
+      default: return <Dashboard profile={userProfile} habits={habits} financialData={financialData} objectives={objectives} setObjectives={setObjectives} exportSoul={exportSoul} importSoul={importSoul} setSection={setCurrentSection} />;
     }
   };
 
